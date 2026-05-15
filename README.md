@@ -41,7 +41,7 @@ fraud-detection/
 ```bash
 cd ~/swarm-learning/workspace/
 
-git clone https://github.com/clearlynew/Fraud-Detection-Without-SWOP-SWCI.git fraud-detection
+git clone https://github.com/clearlynew/Fraud-Detection-Without-SWOP-SWCI-using-DP.git fraud-detection
 ```
 
 ---

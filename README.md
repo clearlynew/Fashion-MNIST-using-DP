@@ -284,7 +284,7 @@ docker logs -f ml2 > ~/swarm-learning/workspace/fraud-detection/results/exp1_bas
 
 ---
 
-# Experiments 2–6
+# Experiments 2–9
 
 Use the same commands while changing:
 
@@ -294,50 +294,6 @@ Use the same commands while changing:
 * `OPTIMIZER`
 
 according to the experiment table above.
-
----
-
-# Log Collection
-
-## Experiment 2
-
-```bash
-docker logs -f ml1 > ~/swarm-learning/workspace/fraud-detection/results/exp2_weak_dp_ml1.log 2>&1 &
-
-docker logs -f ml2 > ~/swarm-learning/workspace/fraud-detection/results/exp2_weak_dp_ml2.log 2>&1 &
-```
-
-## Experiment 3
-
-```bash
-docker logs -f ml1 > ~/swarm-learning/workspace/fraud-detection/results/exp3_medium_dp_ml1.log 2>&1 &
-
-docker logs -f ml2 > ~/swarm-learning/workspace/fraud-detection/results/exp3_medium_dp_ml2.log 2>&1 &
-```
-
-## Experiment 4
-
-```bash
-docker logs -f ml1 > ~/swarm-learning/workspace/fraud-detection/results/exp4_strong_dp_ml1.log 2>&1 &
-
-docker logs -f ml2 > ~/swarm-learning/workspace/fraud-detection/results/exp4_strong_dp_ml2.log 2>&1 &
-```
-
-## Experiment 5
-
-```bash
-docker logs -f ml1 > ~/swarm-learning/workspace/fraud-detection/results/exp5_medium_dp_4epochs_ml1.log 2>&1 &
-
-docker logs -f ml2 > ~/swarm-learning/workspace/fraud-detection/results/exp5_medium_dp_4epochs_ml2.log 2>&1 &
-```
-
-## Experiment 6
-
-```bash
-docker logs -f ml1 > ~/swarm-learning/workspace/fraud-detection/results/exp6_medium_dp_adam_ml1.log 2>&1 &
-
-docker logs -f ml2 > ~/swarm-learning/workspace/fraud-detection/results/exp6_medium_dp_adam_ml2.log 2>&1 &
-```
 
 ---
 

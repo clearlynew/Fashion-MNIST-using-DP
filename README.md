@@ -4,17 +4,20 @@
 
 This project demonstrates distributed fraud detection training using:
 
-- HPE Swarm Learning
-- TensorFlow/Keras
-- Differential Privacy (DP-SGD)
-- TensorFlow Privacy
+* HPE Swarm Learning
+* TensorFlow/Keras
+* Differential Privacy (DP-SGD / DP-Adam)
+* TensorFlow Privacy
 
 The implementation supports:
 
-- Standard SGD training
-- Differentially Private SGD (DP-SGD)
-- Configurable Gaussian noise
-- Privacy accounting (Epsilon & Delta reporting)
+* Standard SGD / Adam training
+* Differentially Private SGD and Adam
+* Configurable Gaussian noise
+* Privacy accounting (Epsilon & Delta reporting)
+* AUC-ROC and AUC-PR metrics
+* Automatic JSON result saving
+* Automatic ML log collection
 
 ---
 
@@ -28,6 +31,9 @@ fraud-detection/
 ├── ml-context/
 ├── model/
 │   └── fraud-detection.py
+├── results/
+│   ├── *.json
+│   └── *.log
 ├── tmp/
 │   ├── sl1/
 │   └── sl2/
@@ -72,7 +78,7 @@ cd ../../../
 
 ---
 
-# 4. Create Docker Network (if not already created)
+# 4. Create Docker Network
 
 ```bash
 docker network create host-1-net
@@ -80,19 +86,23 @@ docker network create host-1-net
 
 ---
 
-# 5. Create Separate Mount Directory
+# 5. Create Required Directories
 
 ```bash
 mkdir -p ~/swarm-learning/workspace/fraud-detection/tmp/sl1
 
 mkdir -p ~/swarm-learning/workspace/fraud-detection/tmp/sl2
 
+mkdir -p ~/swarm-learning/workspace/fraud-detection/results
+
 chmod -R 777 ~/swarm-learning/workspace/fraud-detection/tmp
+
+chmod -R 777 ~/swarm-learning/workspace/fraud-detection/results
 ```
 
 ---
 
-# 6. Copy SwarmLearning Wheel and delete duplicate
+# 6. Copy SwarmLearning Wheel and Remove Duplicate
 
 ```bash
 cp ~/swarm-learning/lib/swarmlearning-*.whl \
@@ -111,7 +121,7 @@ docker build -t fraud-ml-env ~/swarm-learning/workspace/fraud-detection/ml-conte
 
 ---
 
-# 8. Run APLS (only if not running or not connected)
+# 8. Run APLS
 
 ```bash
 docker run -d \
@@ -125,7 +135,7 @@ hub.myenterpriselicense.hpe.com/hpe_eval/autopass/apls:9.19
 
 ---
 
-# Set Environment Variables (according to hostname -I)
+# Set Environment Variables
 
 ```bash
 export HOST_IP=172.1.1.1
@@ -157,13 +167,13 @@ cd ~/swarm-learning
 
 ---
 
-# 10. Monitor SN until ready
+# 10. Monitor SN Until Ready
 
 ```bash
 docker logs -f sn1
 ```
 
-Wait until you see:
+Wait until:
 
 ```text
 swarm.blCnt : INFO : Starting SWARM-API-SERVER on port: 30304
@@ -171,9 +181,32 @@ swarm.blCnt : INFO : Starting SWARM-API-SERVER on port: 30304
 
 ---
 
-# 11. Baseline Training (WITHOUT Differential Privacy)
+# Between Experiments
 
-## Run SL1 (Baseline)
+Stop old containers before every new experiment:
+
+```bash
+docker rm -f sn1 sl1 sl2 ml1 ml2 2>/dev/null
+```
+
+---
+
+# Experiment Summary
+
+| Exp | DP  | Noise | Epochs | Optimizer |
+| --- | --- | ----- | ------ | --------- |
+| 1   | No  | 0.0   | 8      | SGD       |
+| 2   | Yes | 0.1   | 8      | SGD       |
+| 3   | Yes | 0.5   | 8      | SGD       |
+| 4   | Yes | 1.0   | 8      | SGD       |
+| 5   | Yes | 0.5   | 4      | SGD       |
+| 6   | Yes | 0.5   | 8      | Adam      |
+
+---
+
+# Experiment 1 — Baseline
+
+## Run SL1
 
 ```bash
 ./scripts/bin/run-sl -d --name=sl1 \
@@ -189,20 +222,30 @@ swarm.blCnt : INFO : Starting SWARM-API-SERVER on port: 30304
 --ml-name=ml1 \
 --ml-entrypoint=python3 \
 --ml-cmd=/tmp/test/model/fraud-detection.py \
--v ~/workspace/fraud-detection/tmp/sl1:/tmp/hpe-swarm \
+-v ~/swarm-learning/workspace/fraud-detection/tmp/sl1:/tmp/hpe-swarm \
 --ml-v workspace/fraud-detection/model:/tmp/test/model \
 --ml-v workspace/fraud-detection/data-and-scratch1/app-data:/app-data \
+--ml-v workspace/fraud-detection/results:/results \
 --ml-e DATA_DIR=/app-data \
 --ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp1_baseline_sl1.json \
 --ml-e MIN_PEERS=2 \
 --ml-e MAX_EPOCHS=8 \
 --ml-e DP_ENABLED=false \
+--ml-e OPTIMIZER=sgd \
+--ml-e METRIC=both \
 --apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml1 > ~/swarm-learning/workspace/fraud-detection/results/exp1_baseline_ml1.log 2>&1 &
 ```
 
 ---
 
-## Run SL2 (Baseline)
+## Run SL2
 
 ```bash
 ./scripts/bin/run-sl -d --name=sl2 \
@@ -218,91 +261,53 @@ swarm.blCnt : INFO : Starting SWARM-API-SERVER on port: 30304
 --ml-name=ml2 \
 --ml-entrypoint=python3 \
 --ml-cmd=/tmp/test/model/fraud-detection.py \
--v ~/workspace/fraud-detection/tmp/sl2:/tmp/hpe-swarm \
+-v ~/swarm-learning/workspace/fraud-detection/tmp/sl2:/tmp/hpe-swarm \
 --ml-v workspace/fraud-detection/model:/tmp/test/model \
 --ml-v workspace/fraud-detection/data-and-scratch2/app-data:/app-data \
+--ml-v workspace/fraud-detection/results:/results \
 --ml-e DATA_DIR=/app-data \
 --ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp1_baseline_sl2.json \
 --ml-e MIN_PEERS=2 \
 --ml-e MAX_EPOCHS=8 \
 --ml-e DP_ENABLED=false \
+--ml-e OPTIMIZER=sgd \
+--ml-e METRIC=both \
 --apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml2 > ~/swarm-learning/workspace/fraud-detection/results/exp1_baseline_ml2.log 2>&1 &
 ```
 
 ---
 
-# 12. Differential Privacy Training (DP-SGD Enabled)
+# Experiments 2–10
 
-## Run SL1 (DP Enabled)
+Use the same commands while changing:
 
-```bash
-./scripts/bin/run-sl -d --name=sl1 \
---network=host-1-net \
---host-ip=${HOST_IP} \
---sn-ip=${SN_IP} \
---sn-api-port=${SN_API_PORT} \
---sl-fs-port=16000 \
---key=workspace/fraud-detection/cert/sl-1-key.pem \
---cert=workspace/fraud-detection/cert/sl-1-cert.pem \
---capath=workspace/fraud-detection/cert/ca/capath \
---ml-image=fraud-ml-env \
---ml-name=ml1 \
---ml-entrypoint=python3 \
---ml-cmd=/tmp/test/model/fraud-detection.py \
--v ~/workspace/fraud-detection/tmp/sl1:/tmp/hpe-swarm \
---ml-v workspace/fraud-detection/model:/tmp/test/model \
---ml-v workspace/fraud-detection/data-and-scratch1/app-data:/app-data \
---ml-e DATA_DIR=/app-data \
---ml-e SCRATCH_DIR=/tmp/scratch \
---ml-e MIN_PEERS=2 \
---ml-e MAX_EPOCHS=8 \
---ml-e DP_ENABLED=true \
---ml-e NOISE_MULTIPLIER=0.1 \
---ml-e L2_NORM_CLIP=1.0 \
---ml-e MICROBATCHES=32 \
---apls-ip=${APLS_IP}
-```
+* `RESULT_FILE`
+* `NOISE_MULTIPLIER`
+* `MAX_EPOCHS`
+* `OPTIMIZER`
+
+according to the experiment table above.
 
 ---
 
-## Run SL2 (DP Enabled)
+# Results Storage
 
-```bash
-./scripts/bin/run-sl -d --name=sl2 \
---network=host-1-net \
---host-ip=${HOST_IP} \
---sn-ip=${SN_IP} \
---sn-api-port=${SN_API_PORT} \
---sl-fs-port=17000 \
---key=workspace/fraud-detection/cert/sl-2-key.pem \
---cert=workspace/fraud-detection/cert/sl-2-cert.pem \
---capath=workspace/fraud-detection/cert/ca/capath \
---ml-image=fraud-ml-env \
---ml-name=ml2 \
---ml-entrypoint=python3 \
---ml-cmd=/tmp/test/model/fraud-detection.py \
--v ~/workspace/fraud-detection/tmp/sl2:/tmp/hpe-swarm \
---ml-v workspace/fraud-detection/model:/tmp/test/model \
---ml-v workspace/fraud-detection/data-and-scratch2/app-data:/app-data \
---ml-e DATA_DIR=/app-data \
---ml-e SCRATCH_DIR=/tmp/scratch \
---ml-e MIN_PEERS=2 \
---ml-e MAX_EPOCHS=8 \
---ml-e DP_ENABLED=true \
---ml-e NOISE_MULTIPLIER=0.1 \
---ml-e L2_NORM_CLIP=1.0 \
---ml-e MICROBATCHES=32 \
---apls-ip=${APLS_IP}
-```
+Each experiment automatically saves:
 
----
+* JSON metrics/results
+* Full ML training logs
 
-# 13. Monitor Training
+inside:
 
-```bash
-docker logs -f sl1
-
-docker logs -f sl2
+```text
+workspace/fraud-detection/results/
 ```
 
 ---
@@ -311,28 +316,18 @@ docker logs -f sl2
 
 | Parameter          | Description                 |
 | ------------------ | --------------------------- |
-| `DP_ENABLED`       | Enables/disables DP-SGD     |
+| `DP_ENABLED`       | Enables/disables DP         |
 | `NOISE_MULTIPLIER` | Gaussian noise multiplier   |
 | `L2_NORM_CLIP`     | Gradient clipping threshold |
 | `MICROBATCHES`     | Number of microbatches      |
-| `MAX_EPOCHS`       | Training epochs             |
-
----
-
-# Example Experimental Configurations
-
-| Experiment | Noise Multiplier |
-| ---------- | ---------------- |
-| Baseline   | 0                |
-| Weak DP    | 0.1              |
-| Medium DP  | 0.5              |
-| Strong DP  | 1.0              |
+| `MAX_EPOCHS`       | Number of training epochs   |
+| `OPTIMIZER`        | SGD or Adam                 |
+| `METRIC`           | auc_roc / auc_pr / both     |
+| `RESULT_FILE`      | Output JSON filename        |
 
 ---
 
 # Expected Results
-
-Increasing Differential Privacy strength generally causes:
 
 | Privacy ↑        | Utility ↓            |
 | ---------------- | -------------------- |
@@ -342,67 +337,8 @@ Increasing Differential Privacy strength generally causes:
 
 ---
 
-# New Features Added to `fraud-detection.py`
-
-The original training script was modified to support Differential Privacy.
-
-## Added Features
-
-### DP-SGD Optimizer Support
-
-```python
-from tensorflow_privacy.privacy.optimizers.dp_optimizer_keras import DPKerasSGDOptimizer
-```
-
-### Epsilon & Delta Privacy Accounting
-
-```python
-from tensorflow_privacy.privacy.analysis.compute_dp_sgd_privacy_lib import compute_dp_sgd_privacy
-```
-
-### Dynamic DP Configuration via Environment Variables
-
-```python
-DP_ENABLED
-NOISE_MULTIPLIER
-L2_NORM_CLIP
-MICROBATCHES
-```
-
-### Per-example Loss Support
-
-```python
-reduction=tf.keras.losses.Reduction.NONE
-```
-
-### TensorFlow Dataset Pipeline
-
-Added optimized dataset pipelines:
-
-```python
-tf.data.Dataset
-```
-
-with batching, prefetching, and shuffle support.
-
-### Privacy Report Generation
-
-Training now outputs:
-
-```text
-Final Epsilon (ε)
-Final Delta (δ)
-```
-
-after DP training.
-
----
-
 # Notes
 
-- TensorFlow version used: `2.7.0`
-- TensorFlow Privacy version used: `0.7.3`
-- TensorFlow Probability version used: `0.15.0`
-
----
-
+* TensorFlow version: `2.7.0`
+* TensorFlow Privacy version: `0.7.3`
+* TensorFlow Probability version: `0.15.0`

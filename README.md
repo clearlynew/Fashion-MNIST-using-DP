@@ -191,16 +191,15 @@ docker rm -f sn1 sl1 sl2 ml1 ml2 2>/dev/null
 
 ---
 
-# Experiment Summary
+# Experiment Summary (With and Without SWOP)
 
-| Exp | DP  | Noise | Epochs | Optimizer |
+| Exp | DP  | Noise | Epochs | Optimizer | 
 | --- | --- | ----- | ------ | --------- |
 | 1   | No  | 0.0   | 8      | SGD       |
 | 2   | Yes | 0.1   | 8      | SGD       |
 | 3   | Yes | 0.5   | 8      | SGD       |
 | 4   | Yes | 1.0   | 8      | SGD       |
-| 5   | Yes | 0.5   | 4      | SGD       |
-| 6   | Yes | 0.5   | 8      | Adam      |
+| 5   | Yes | 3.0   | 8      | SGD       |
 
 ---
 

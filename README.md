@@ -312,6 +312,109 @@ workspace/fraud-detection/results/
 
 ---
 
+# Running Fraud Detection Using SWOP
+
+## 1. Configure SWCI for 2 Peers
+
+Edit the SWCI initialization file and change the setup from 4 peers to 2 peers.
+
+---
+
+## 2. Update the SWOP Profile
+
+Remove two node definitions and keep only 2 nodes.
+
+Add `RESULT_FILE` inside `userEnvars` for both node definitions.
+
+Example:
+
+```yaml id="mxz1jd"
+userEnvars:
+[
+    SCRATCH_DIR : "user1",
+    RESULT_FILE : "expt2_swop_tf_ml1_results.json"
+]
+```
+
+Second node:
+
+```yaml id="h5if81"
+userEnvars:
+[
+    SCRATCH_DIR : "user2",
+    RESULT_FILE : "expt2_swop_tf_ml2_results.json"
+]
+```
+
+---
+
+## 3. Mount the Results Folder
+
+Go to:
+
+```text id="g2y2xv"
+swci/taskdefs/swarm_fd/task.yaml
+```
+
+Add:
+
+```yaml id="e4m4jm"
+- Src: /path/to/your/fraud-detection/results
+  Tgt: /results
+  MType: BIND
+```
+
+Example:
+
+```yaml id="jpb6dr"
+- Src: /home/<your-username>/swarm-learning/workspace/fraud-detection/results
+  Tgt: /results
+  MType: BIND
+```
+
+---
+
+## 4. Set Minimum Peers and Epochs
+
+In:
+
+```text id="ibpx4f"
+swci/taskdefs/swarm_fd/task.yaml
+```
+
+set:
+
+```yaml id="a2um2i"
+"MAX_EPOCHS": 8,
+"MIN_PEERS": 2
+```
+
+---
+
+## 5. Use the Required Fraud Detection Script
+
+Inside the `model` folder:
+
+```text id="l4af8h"
+model/
+├── fraud-detection.py
+├── fraud-detection_swop_numpy.py
+└── fraud-detection_tf_swop.py
+```
+
+Use the version you want for the experiment and remove the rest from the configuration.
+
+---
+
+## 6. Run the Experiment
+
+The results and logs will be saved inside:
+
+```text id="8w9yiu"
+fraud-detection/results/
+```
+---
+
 # Differential Privacy Parameters
 
 | Parameter          | Description                 |

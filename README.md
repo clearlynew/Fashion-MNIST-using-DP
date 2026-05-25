@@ -105,8 +105,6 @@ chmod -R 777 ~/swarm-learning/workspace/fashion-mnist/results
 ```bash
 cp ~/swarm-learning/lib/swarmlearning-client-py3-none-manylinux_2_24_x86_64.whl \
 ~/swarm-learning/workspace/fashion-mnist/ml-context/swarmlearning-0.0.1-py3-none-manylinux_2_24_x86_64.whl
-
-rm ~/swarm-learning/workspace/fashion-mnist/ml-context/swarmlearning-client-py3-none-manylinux_2_24_x86_64.whl
 ```
 
 ---

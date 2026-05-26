@@ -229,6 +229,8 @@ docker rm -f sn1 sl1 sl2 ml1 ml2 2>/dev/null
 --ml-e RESULT_FILE=exp_baseline_adam_sl1.json \
 --ml-e MIN_PEERS=2 \
 --ml-e MAX_EPOCHS=8 \
+--ml-e NODE_ID=0 \
+--ml-e NUM_NODES=2 \
 --ml-e DP_ENABLED=false \
 --ml-e OPTIMIZER=adam \
 --ml-e METRIC=both \
@@ -268,6 +270,8 @@ docker logs -f ml1 > \
 --ml-e RESULT_FILE=exp_baseline_adam_sl2.json \
 --ml-e MIN_PEERS=2 \
 --ml-e MAX_EPOCHS=8 \
+--ml-e NODE_ID=1 \
+--ml-e NUM_NODES=2 \
 --ml-e DP_ENABLED=false \
 --ml-e OPTIMIZER=adam \
 --ml-e METRIC=both \
@@ -309,6 +313,8 @@ docker logs -f ml2 > \
 --ml-e RESULT_FILE=exp_dp1_adam_sl1.json \
 --ml-e MIN_PEERS=2 \
 --ml-e MAX_EPOCHS=8 \
+--ml-e NODE_ID=0 \
+--ml-e NUM_NODES=2 \
 --ml-e DP_ENABLED=true \
 --ml-e NOISE_MULTIPLIER=1 \
 --ml-e L2_NORM_CLIP=1.0 \
@@ -351,6 +357,8 @@ docker logs -f ml1 > \
 --ml-e RESULT_FILE=exp_dp1_adam_sl2.json \
 --ml-e MIN_PEERS=2 \
 --ml-e MAX_EPOCHS=8 \
+--ml-e NODE_ID=1 \
+--ml-e NUM_NODES=2 \
 --ml-e DP_ENABLED=true \
 --ml-e NOISE_MULTIPLIER=1 \
 --ml-e L2_NORM_CLIP=1.0 \

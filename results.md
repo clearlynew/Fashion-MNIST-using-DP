@@ -24,6 +24,11 @@
 | Yes        | SGD       | 1.0              | 1.0          | 32           | Default       | 8      | 0.6756      | 3.33e-05  | 0.9421 | 0.5964   | 0.5291   | 251.19            | 4.19                |
 | Yes        | SGD       | 3.0              | 1.0          | 32           | Default       | 8      | 0.1153      | 3.33e-05  | 0.9553 | 0.6023   | 0.5566   | 258.13            | 4.30                |
 
+## AutoTuned Model
+| Node | DP Enabled | Optimizer         | Noise Multiplier | L2 Norm Clip | Microbatches | Learning Rate | Epochs | Epsilon (ε) | Delta (δ) | Loss   | Accuracy | F1 Score | Training Time (s) | Training Time (min) |
+| ---- | ---------- | ----------------- | ---------------- | ------------ | ------------ | ------------- | ------ | ----------- | --------- | ------ | -------- | -------- | ----------------- | ------------------- |
+| ML1  | Yes        | Adam (Auto-Tuned) | 0.4305           | 1.5081       | 32           | Default       | 8      | 9.9957      | 3.33e-05  | 0.8356 | 0.7759   | 0.7656   | 260.70            | 4.34                |
+| ML2  | Yes        | Adam (Auto-Tuned) | 0.4305           | 1.5081       | 32           | Default       | 8      | 9.9957      | 3.33e-05  | 0.8356 | 0.7759   | 0.7656   | 259.96            | 4.33                |
 
 ---
 

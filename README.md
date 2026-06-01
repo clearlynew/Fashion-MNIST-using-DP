@@ -411,6 +411,117 @@ All JSON metrics + logs are automatically saved inside:
 
 ---
 
+# Example Experiment — Adaptive DP Adam (Auto-Tuned)
+
+## Run SL1
+
+```bash
+./scripts/bin/run-sl -d --name=sl1 \
+--network=host-1-net \
+--host-ip=${HOST_IP} \
+--sn-ip=${SN_IP} \
+--sn-api-port=${SN_API_PORT} \
+--sl-fs-port=16000 \
+--key=workspace/fashion-mnist/cert/sl-1-key.pem \
+--cert=workspace/fashion-mnist/cert/sl-1-cert.pem \
+--capath=workspace/fashion-mnist/cert/ca/capath \
+--ml-image=fashion-ml-env \
+--ml-name=ml1 \
+--ml-entrypoint=python3 \
+--ml-cmd=/tmp/test/model/fashion-mnist_v2.py \
+-v ~/swarm-learning/workspace/fashion-mnist/tmp/sl1:/tmp/hpe-swarm \
+--ml-v workspace/fashion-mnist/model:/tmp/test/model \
+--ml-v workspace/fashion-mnist/results:/results \
+--ml-e DATA_DIR=/app-data \
+--ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp_autotune_adam_sl1.json \
+--ml-e MIN_PEERS=2 \
+--ml-e MAX_EPOCHS=8 \
+--ml-e NODE_ID=0 \
+--ml-e NUM_NODES=2 \
+--ml-e DP_ENABLED=true \
+--ml-e DP_AUTO_TUNE=true \
+--ml-e DP_TARGET_EPSILON=10.0 \
+--ml-e DP_ADAPTIVE_CALLBACK=true \
+--ml-e OPTIMIZER=adam \
+--ml-e METRIC=both \
+--apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml1 > \
+~/swarm-learning/workspace/fashion-mnist/results/exp_autotune_adam_ml1.log 2>&1 &
+```
+
+---
+
+## Run SL2
+
+```bash
+./scripts/bin/run-sl -d --name=sl2 \
+--network=host-1-net \
+--host-ip=${HOST_IP} \
+--sn-ip=${SN_IP} \
+--sn-api-port=${SN_API_PORT} \
+--sl-fs-port=17000 \
+--key=workspace/fashion-mnist/cert/sl-2-key.pem \
+--cert=workspace/fashion-mnist/cert/sl-2-cert.pem \
+--capath=workspace/fashion-mnist/cert/ca/capath \
+--ml-image=fashion-ml-env \
+--ml-name=ml2 \
+--ml-entrypoint=python3 \
+--ml-cmd=/tmp/test/model/fashion-mnist_v2.py \
+-v ~/swarm-learning/workspace/fashion-mnist/tmp/sl2:/tmp/hpe-swarm \
+--ml-v workspace/fashion-mnist/model:/tmp/test/model \
+--ml-v workspace/fashion-mnist/results:/results \
+--ml-e DATA_DIR=/app-data \
+--ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp_autotune_adam_sl2.json \
+--ml-e MIN_PEERS=2 \
+--ml-e MAX_EPOCHS=8 \
+--ml-e NODE_ID=1 \
+--ml-e NUM_NODES=2 \
+--ml-e DP_ENABLED=true \
+--ml-e DP_AUTO_TUNE=true \
+--ml-e DP_TARGET_EPSILON=10.0 \
+--ml-e DP_ADAPTIVE_CALLBACK=true \
+--ml-e OPTIMIZER=adam \
+--ml-e METRIC=both \
+--apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml2 > \
+~/swarm-learning/workspace/fashion-mnist/results/exp_autotune_adam_ml2.log 2>&1 &
+```
+
+---
+
+## Additional Parameters Used
+
+| Parameter            | Value               |
+| -------------------- | ------------------- |
+| DP_ENABLED           | true                |
+| DP_AUTO_TUNE         | true                |
+| DP_TARGET_EPSILON    | 10.0                |
+| DP_ADAPTIVE_CALLBACK | true                |
+| OPTIMIZER            | adam                |
+| MAX_EPOCHS           | 8                   |
+| MODEL FILE           | fashion-mnist_v2.py |
+
+### Description
+
+* `DP_AUTO_TUNE=true` automatically profiles the dataset and selects suitable DP parameters.
+* `DP_TARGET_EPSILON=10.0` specifies the target privacy budget.
+* `DP_ADAPTIVE_CALLBACK=true` enables dynamic adjustment of privacy parameters during training.
+* `fashion-mnist_v2.py` includes the adaptive privacy callback and auto-tuning functionality. 
+
+---
+
 # Notes
 
 - TensorFlow version: `2.7.0`

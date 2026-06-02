@@ -89,6 +89,58 @@
 | DP-1.0 | SGD | Yes | 1.0 | 0.6756 | 3.3333e-05 | 0.9232 | 0.6321 | 0.5796 | 289.93 | 4.83 |
 | DP-3.0 | SGD | Yes | 3.0 | 0.1153 | 3.3333e-05 | 0.9453 | 0.6082 | 0.5599 | 297.15 | 4.95 |
 
+## Auto-Tuned Adam Results
+
+| Node | DP Enabled | Optimizer                  | Noise Multiplier | L2 Norm Clip | Microbatches | Learning Rate | Epochs | Epsilon (ε) | Delta (δ) | Loss   | Accuracy | F1 Score | Training Time (s) | Training Time (min) |
+| ---- | ---------- | -------------------------- | ---------------- | ------------ | ------------ | ------------- | ------ | ----------- | --------- | ------ | -------- | -------- | ----------------- | ------------------- |
+| ML1  | Yes        | Adam (Auto-Tuned)          | 0.4305           | 1.5081       | 32           | Default       | 8      | 9.9957      | 3.33e-05  | 0.8816 | 0.7666   | 0.7497   | 359.27            | 5.99                |
+| ML2  | Yes        | Adam (Auto-Tuned)          | 0.4305           | 1.5081       | 32           | Default       | 8      | 9.9957      | 3.33e-05  | 0.8816 | 0.7666   | 0.7497   | 361.63            | 6.03                |
+| ML1  | Yes        | Adam (Auto-Tuned Adaptive) | 0.6218           | 1.5081       | 32           | Default       | 20     | 3.1496      | 3.33e-05  | 0.8496 | 0.8102   | 0.8084   | 905.01            | 15.08               |
+| ML2  | Yes        | Adam (Auto-Tuned Adaptive) | 0.6218           | 1.5081       | 32           | Default       | 20     | 3.1496      | 3.33e-05  | 0.8496 | 0.8102   | 0.8084   | 827.47            | 13.79               |
+
+## Adaptive Tuning Summary (8 Epochs)
+
+| Node | Initial Noise | Final Noise | Initial Clip | Final Clip | Adjustments Made | Final ε |
+|------|---------------|-------------|--------------|------------|------------------|---------|
+| ML1 | 0.4305 | 0.4305 | 1.5081 | 1.5081 | 0 | 9.9957 |
+| ML2 | 0.4305 | 0.4305 | 1.5081 | 1.5081 | 0 | 9.9957 |
+
+## ML1 Adjustment Log (8 Epochs)
+
+No adaptive adjustments were triggered during training.
+
+## ML2 Adjustment Log (8 Epochs)
+
+No adaptive adjustments were triggered during training.
+
+## Adaptive Tuning Summary (20 epochs)
+
+| Node | Initial Noise | Final Noise | Initial Clip | Final Clip | Adjustments Made | Final ε |
+| ---- | ------------- | ----------- | ------------ | ---------- | ---------------- | ------- |
+| ML1  | 0.4640        | 0.6218      | 1.5081       | 1.5081     | 6                | 3.1496  |
+| ML2  | 0.4640        | 0.6218      | 1.5081       | 1.5081     | 6                | 3.1496  |
+
+## ML1 Adjustment Log (20 epochs)
+
+| Epoch | Validation Accuracy | Noise Change    |
+| ----- | ------------------- | --------------- |
+| 15    | 0.8053              | 0.4640 → 0.4872 |
+| 16    | 0.8064              | 0.4872 → 0.5116 |
+| 17    | 0.8083              | 0.5116 → 0.5371 |
+| 18    | 0.8045              | 0.5371 → 0.5640 |
+| 19    | 0.8073              | 0.5640 → 0.5922 |
+| 20    | 0.8117              | 0.5922 → 0.6218 |
+
+## ML2 Adjustment Log (20 epochs)
+
+| Epoch | Validation Accuracy | Noise Change    |
+| ----- | ------------------- | --------------- |
+| 14    | 0.8014              | 0.4640 → 0.4872 |
+| 16    | 0.8062              | 0.4872 → 0.5116 |
+| 17    | 0.8072              | 0.5116 → 0.5371 |
+| 18    | 0.8075              | 0.5371 → 0.5640 |
+| 19    | 0.8088              | 0.5640 → 0.5922 |
+| 20    | 0.8087              | 0.5922 → 0.6218 |
 
 ---
 

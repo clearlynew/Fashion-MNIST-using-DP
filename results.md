@@ -166,6 +166,47 @@ No adaptive adjustments were triggered during training.
 | DP Adam 1.0   | Yes | 1.0   | 0.6756      | 3.33e-05  | Adam      | 0.7159   | 0.6929   | 0.9095 | 432.14            | 7.20                |
 | DP Adam 3.0   | Yes | 3.0   | 0.1153      | 3.33e-05  | Adam      | 0.6219   | 0.5857   | 0.9152 | 397.31            | 6.62                |
 
+## Auto-Tuned Adam Results
+
+| Node | DP Enabled | Optimizer                  | Noise Multiplier | L2 Norm Clip | Microbatches | Learning Rate | Epochs | Epsilon (ε) | Delta (δ) | Loss   | Accuracy | F1 Score | Training Time (s) | Training Time (min) |
+| ---- | ---------- | -------------------------- | ---------------- | ------------ | ------------ | ------------- | ------ | ----------- | --------- | ------ | -------- | -------- | ----------------- | ------------------- |
+| ML1  | Yes        | Adam (Auto-Tuned)          | 0.4640           | 1.5081       | 32           | Default       | 8      | 9.9981      | 3.33e-05  | —      | —        | —        | —                 | —                   |
+| ML2  | Yes        | Adam (Auto-Tuned)          | 0.4640           | 1.5081       | 32           | Default       | 8      | 9.9981      | 3.33e-05  | —      | —        | —        | —                 | —                   |
+| ML1  | Yes        | Adam (Auto-Tuned Adaptive) | 0.6855           | 1.5081       | 32           | Default       | 20     | 2.4006      | 3.33e-05  | 0.8040 | 0.8125   | 0.8083   | 1265.41           | 21.09               |
+| ML2  | Yes        | Adam (Auto-Tuned Adaptive) | 0.6529           | 1.5081       | 32           | Default       | 20     | 2.6574      | 3.33e-05  | 0.8040 | 0.8125   | 0.8083   | 1260.84           | 21.01               |
+
+## Adaptive Tuning Summary (20 Epochs)
+
+| Node | Initial Noise | Final Noise | Initial Clip | Final Clip | Adjustments Made | Final ε |
+| ---- | ------------- | ----------- | ------------ | ---------- | ---------------- | ------- |
+| ML1  | 0.4640        | 0.6855      | 1.5081       | 1.5081     | 8                | 2.4006  |
+| ML2  | 0.4640        | 0.6529      | 1.5081       | 1.5081     | 7                | 2.6574  |
+
+## ML1 Adjustment Log (20 Epochs)
+
+| Epoch | Validation Accuracy | Noise Change    |
+| ----- | ------------------- | --------------- |
+| 13    | 0.8018              | 0.4640 → 0.4872 |
+| 14    | 0.8032              | 0.4872 → 0.5116 |
+| 15    | 0.8049              | 0.5116 → 0.5371 |
+| 16    | 0.8103              | 0.5371 → 0.5640 |
+| 17    | 0.8099              | 0.5640 → 0.5922 |
+| 18    | 0.8106              | 0.5922 → 0.6218 |
+| 19    | 0.8083              | 0.6218 → 0.6529 |
+| 20    | 0.8122              | 0.6529 → 0.6855 |
+
+## ML2 Adjustment Log (20 Epochs)
+
+| Epoch | Validation Accuracy | Noise Change    |
+| ----- | ------------------- | --------------- |
+| 14    | 0.8046              | 0.4640 → 0.4872 |
+| 15    | 0.8063              | 0.4872 → 0.5116 |
+| 16    | 0.8064              | 0.5116 → 0.5371 |
+| 17    | 0.8098              | 0.5371 → 0.5640 |
+| 18    | 0.8120              | 0.5640 → 0.5922 |
+| 19    | 0.8138              | 0.5922 → 0.6218 |
+| 20    | 0.8115              | 0.6218 → 0.6529 |
+
 ---
 
 ## Results (Goutham)

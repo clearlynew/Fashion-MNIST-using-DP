@@ -1,11 +1,27 @@
 {
   "config": {
-    "dp_enabled": true,
+    "model_name": "fashion-mnist",
+    "node_id": 1,
+    "num_nodes": 2,
     "epochs": 50,
-    "cascaded_dp": false
+    "batch_size": 32,
+    "optimizer": "adam",
+    "learning_rate": 0.001,
+    "dp_enabled": true,
+    "cascaded_dp": false,
+    "l2_norm_clip": 1.0,
+    "noise_multiplier": 0.5,
+    "microbatches": 32
+  },
+  "performance": {
+    "training_time_seconds": 1499.37,
+    "final_test_loss": 0.877263069152832,
+    "final_test_accuracy": 0.8292999863624573,
+    "final_test_f1_macro": 0.8264040890141967
   },
   "privacy": {
     "epsilon": 10.2567,
+    "delta": 3.3333333333333335e-05,
     "dp_drop_epoch": null
   }
 }

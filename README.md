@@ -546,7 +546,7 @@ chmod 777 ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch
 --ml-image=fashion-ml-env \
 --ml-name=ml1 \
 --ml-entrypoint=python3 \
---ml-cmd=/tmp/test/model/fashion-mnist.py \
+--ml-cmd=/tmp/test/model/fashion-mnist_v3.py \
 -v ~/swarm-learning/workspace/fashion-mnist/tmp/sl1:/tmp/hpe-swarm \
 --ml-v ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch:/tmp/scratch \
 --ml-v ~/swarm-learning/workspace/fashion-mnist/model:/tmp/test/model \
@@ -596,7 +596,7 @@ docker logs -f ml1 > \
 --ml-image=fashion-ml-env \
 --ml-name=ml2 \
 --ml-entrypoint=python3 \
---ml-cmd=/tmp/test/model/fashion-mnist.py \
+--ml-cmd=/tmp/test/model/fashion-mnist_v3.py \
 -v ~/swarm-learning/workspace/fashion-mnist/tmp/sl2:/tmp/hpe-swarm \
 --ml-v ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch:/tmp/scratch \
 --ml-v ~/swarm-learning/workspace/fashion-mnist/model:/tmp/test/model \

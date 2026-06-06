@@ -59,14 +59,16 @@
 | 20    | 0.8121              | 0.5922 → 0.6218 |
 
 ## Cascaded DP results
-| Experiment  | ML Node      | DP  | Cascaded DP | Noise | Epochs | Training Time (s) | Test Loss | Test Accuracy (%) | Macro F1 (%) | ε (Epsilon) | δ (Delta) | DP Drop Epoch |
-| ----------- | ------------ | --- | ----------- | ----- | ------ | ----------------: | --------: | ----------------: | -----------: | ----------: | --------- | ------------: |
-| Baseline    | ML1 (Node 0) | No  | No          | 0.0   | 50     |            770.02 |    0.3176 |             89.29 |        89.27 |         N/A | N/A       |           N/A |
-| Baseline    | ML2 (Node 1) | No  | No          | 0.0   | 50     |            767.15 |    0.3176 |             89.29 |        89.27 |         N/A | N/A       |           N/A |
-| Cascaded DP | ML1 (Node 0) | Yes | Yes         | 0.5   | 50     |            893.35 |    0.3180 |             88.71 |        88.61 |      5.8038 | 3.33×10⁻⁵ |             9 |
-| Cascaded DP | ML2 (Node 1) | Yes | Yes         | 0.5   | 50     |            887.80 |    0.3180 |             88.71 |        88.61 |      5.9819 | 3.33×10⁻⁵ |            10 |
-| Standard DP | ML1 (Node 0) | Yes | No          | 0.5   | 50     |           1500.08 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |
-| Standard DP | ML2 (Node 1) | Yes | No          | 0.5   | 50     |           1499.37 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |
+| Experiment                      | ML Node      | DP  | Cascaded DP | Noise | Epochs | Training Time (s) | Test Loss | Test Accuracy (%) | Macro F1 (%) | ε (Epsilon) | δ (Delta) | DP Drop Epoch | Gradient Stability Threshold | Accuracy Plateau Threshold |
+| ------------------------------- | ------------ | --- | ----------- | ----- | ------ | ----------------: | --------: | ----------------: | -----------: | ----------: | --------- | ------------: | ---------------------------: | -------------------------: |
+| Baseline                        | ML1 (Node 0) | No  | No          | 0.0   | 50     |            770.02 |    0.3176 |             89.29 |        89.27 |         N/A | N/A       |           N/A |                          N/A |                        N/A |
+| Baseline                        | ML2 (Node 1) | No  | No          | 0.0   | 50     |            767.15 |    0.3176 |             89.29 |        89.27 |         N/A | N/A       |           N/A |                          N/A |                        N/A |
+| Cascaded DP (Loose Thresholds)  | ML1 (Node 0) | Yes | Yes         | 0.5   | 50     |            871.63 |    0.3225 |             88.70 |        88.59 |      5.6255 | 3.33×10⁻⁵ |             8 |                         0.04 |                      0.001 |
+| Cascaded DP (Loose Thresholds)  | ML2 (Node 1) | Yes | Yes         | 0.5   | 50     |            873.87 |    0.3225 |             88.70 |        88.59 |      5.4473 | 3.33×10⁻⁵ |             7 |                         0.04 |                      0.001 |
+| Cascaded DP (Strict Thresholds) | ML1 (Node 0) | Yes | Yes         | 0.5   | 50     |            948.00 |    0.3275 |             88.34 |        88.20 |      6.5167 | 3.33×10⁻⁵ |            13 |                         0.01 |                     0.0005 |
+| Cascaded DP (Strict Thresholds) | ML2 (Node 1) | Yes | Yes         | 0.5   | 50     |            943.91 |    0.3275 |             88.34 |        88.20 |      6.5167 | 3.33×10⁻⁵ |            13 |                         0.01 |                     0.0005 |
+| Standard DP                     | ML1 (Node 0) | Yes | No          | 0.5   | 50     |           1500.08 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |                          N/A |                        N/A |
+| Standard DP                     | ML2 (Node 1) | Yes | No          | 0.5   | 50     |           1499.37 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |                          N/A |                        N/A |
 
 
 

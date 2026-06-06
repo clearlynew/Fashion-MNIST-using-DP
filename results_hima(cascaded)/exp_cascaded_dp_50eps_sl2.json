@@ -14,14 +14,29 @@
     "microbatches": 32
   },
   "performance": {
-    "training_time_seconds": 887.8,
-    "final_test_loss": 0.3179558217525482,
-    "final_test_accuracy": 0.8870999813079834,
-    "final_test_f1_macro": 0.8860671024923501
+    "training_time_seconds": 873.87,
+    "final_test_loss": 0.3225241005420685,
+    "final_test_accuracy": 0.8870000243186951,
+    "final_test_f1_macro": 0.8859393923273677
   },
   "privacy": {
-    "epsilon": 5.9819,
+    "epsilon": 5.4473,
     "delta": 3.3333333333333335e-05,
-    "dp_drop_epoch": 10
+    "dp_drop_epoch": 7,
+    "dp_slope_threshold": 0.04,
+    "accuracy_plateau_threshold": 0.001,
+    "dp_drop_reason": {
+      "epoch": 7,
+      "slope_threshold": 0.04,
+      "acc_variance_threshold": 0.001,
+      "rolling_mean": 4.979151887893677,
+      "val_acc_window": [
+        0.7190999984741211,
+        0.7372999787330627,
+        0.7448999881744385,
+        0.7551000118255615,
+        0.7585999965667725
+      ]
+    }
   }
 }

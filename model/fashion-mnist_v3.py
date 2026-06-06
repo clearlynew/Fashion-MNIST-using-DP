@@ -431,6 +431,14 @@ def main():
             "epsilon": round(eps, 4) if eps is not None else None,
             "delta": 1.0 / num_train_samples if dpEnabled else None,
             "dp_drop_epoch": cascadedDpCallback.dp_drop_epoch if cascadedDpCallback else None,
+            "dp_slope_threshold": slopeThresh,
+    	    "accuracy_plateau_threshold": accPlatThresh,
+
+            "dp_drop_reason": (
+                cascadedDpCallback.dp_drop_reason
+                if cascadedDpCallback
+                else None
+            )
         }
     }
 

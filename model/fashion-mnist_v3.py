@@ -275,6 +275,7 @@ def main():
 
     optimizerType = os.getenv('OPTIMIZER', 'sgd').lower()
     learningRate = float(os.getenv('LEARNING_RATE', '0'))
+    actual_lr = learningRate or (0.001 if optimizerType == 'adam' else 0.01)
 
     # CascadedDP env vars
     cascadedDp    = os.getenv('CASCADED_DP', 'false').lower() == 'true'
@@ -354,7 +355,7 @@ def main():
             num_nodes=numNodes,
             scratch_dir=scratchDir,
             optimizer_type=optimizerType,
-            learning_rate=learningRate or (0.001 if optimizerType == 'adam' else 0.01),
+            learning_rate=actual_lr,
             window_size=dpDropWindow,
             slope_threshold=slopeThresh,
             acc_plateau_threshold=accPlatThresh,
@@ -367,6 +368,28 @@ def main():
     model.fit(train_ds, epochs=maxEpoch, validation_data=val_ds, callbacks=callbacks)
     train_end = time.time()
     training_time = round(train_end - train_start, 2)
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # COMPREHENSIVE FINAL TEST EVALUATION
+    # ─────────────────────────────────────────────────────────────────────────────
+    print('\nRunning final post-training evaluation on test dataset...')
+    
+    # 1. Extract exact test loss and test accuracy using direct evaluate sweep
+    eval_results = model.evaluate(val_ds, verbose=0)
+    final_test_loss = float(eval_results[0])
+    final_test_accuracy = float(eval_results[1])
+
+    # 2. Extract final global validation/test F1-Score
+    y_true_list = []
+    y_pred_list = []
+    for x_b, y_b in val_ds:
+        preds = model.predict_on_batch(x_b)
+        y_true_list.append(np.argmax(y_b.numpy(), axis=1))
+        y_pred_list.append(np.argmax(preds, axis=1))
+    
+    y_true = np.concatenate(y_true_list, axis=0)
+    y_pred = np.concatenate(y_pred_list, axis=0)
+    final_test_f1 = float(f1_score(y_true, y_pred, average='macro'))
 
     # PRIVACY REPORT
     eps = None
@@ -382,26 +405,45 @@ def main():
         print(f"Final Epsilon (ε): {eps:.4f} | Final Delta (δ): {delta:.2e}")
         print('-' * 64)
 
-    # SAVE RESULTS
+    # SAVE COMPREHENSIVE RESULTS
     results = {
         "config": {
-            "dp_enabled": dpEnabled,
+            "model_name": modelName,
+            "node_id": nodeId,
+            "num_nodes": numNodes,
             "epochs": maxEpoch,
+            "batch_size": batchSize,
+            "optimizer": optimizerType,
+            "learning_rate": actual_lr,
+            "dp_enabled": dpEnabled,
             "cascaded_dp": cascadedDp,
+            "l2_norm_clip": l2NormClip,
+            "noise_multiplier": noiseMultiplier,
+            "microbatches": microbatches
+        },
+        "performance": {
+            "training_time_seconds": training_time,
+            "final_test_loss": final_test_loss,
+            "final_test_accuracy": final_test_accuracy,
+            "final_test_f1_macro": final_test_f1
         },
         "privacy": {
             "epsilon": round(eps, 4) if eps is not None else None,
+            "delta": 1.0 / num_train_samples if dpEnabled else None,
             "dp_drop_epoch": cascadedDpCallback.dp_drop_epoch if cascadedDpCallback else None,
         }
     }
 
     result_file = os.getenv("RESULT_FILE", "results.json")
     results_path = os.path.join("/results", result_file)
+    
+    os.makedirs(os.path.dirname(results_path), exist_ok=True)
+    
     with open(results_path, 'w') as f:
         json.dump(results, f, indent=2)
 
     model.save(os.path.join(scratchDir, modelName))
-    print('Saved the trained model!')
+    print('Saved the trained model and verified final test metrics JSON!')
 
 if __name__ == '__main__':
     main()

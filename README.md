@@ -653,6 +653,138 @@ docker logs -f ml2 > \
 * The approach aims to improve final accuracy compared with always-on DP while still providing privacy protection during the critical early stages of training.
 
 
+# Example Experiment — SNR-Gated Cascaded DP Adam
+
+Before running the SWARM nodes we need to create a shared directory inside the temp directory:
+
+```bash
+mkdir -p ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch
+chmod 777 ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch
+```
+
+## Run SL1
+
+```bash
+./scripts/bin/run-sl -d --name=sl1 \
+--network=host-1-net \
+--host-ip=${HOST_IP} \
+--sn-ip=${SN_IP} \
+--sn-api-port=${SN_API_PORT} \
+--sl-fs-port=16000 \
+--key=workspace/fashion-mnist/cert/sl-1-key.pem \
+--cert=workspace/fashion-mnist/cert/sl-1-cert.pem \
+--capath=workspace/fashion-mnist/cert/ca/capath \
+--ml-image=fashion-ml-env \
+--ml-name=ml1 \
+--ml-entrypoint=python3 \
+--ml-cmd=/tmp/test/model/fashion-mnist_snr.py \
+-v ~/swarm-learning/workspace/fashion-mnist/tmp/sl1:/tmp/hpe-swarm \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch:/tmp/scratch \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/model:/tmp/test/model \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/results:/results \
+--ml-e DATA_DIR=/app-data \
+--ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp_snr_cascaded_dp_sl1.json \
+--ml-e MIN_PEERS=2 \
+--ml-e MAX_EPOCHS=50 \
+--ml-e NODE_ID=0 \
+--ml-e NUM_NODES=2 \
+--ml-e OPTIMIZER=adam \
+--ml-e LEARNING_RATE=0.001 \
+--ml-e DP_ENABLED=true \
+--ml-e NOISE_MULTIPLIER=0.5 \
+--ml-e L2_NORM_CLIP=1.0 \
+--ml-e MICROBATCHES=32 \
+--ml-e CASCADED_DP=true \
+--ml-e SNR_THRESHOLD=1.0 \
+--ml-e DP_DROP_WINDOW=5 \
+--ml-e MIN_DP_EPOCHS=5 \
+--apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml1 > \
+~/swarm-learning/workspace/fashion-mnist/results/exp_snr_cascaded_dp_ml1.log 2>&1 &
+```
+
+---
+
+## Run SL2
+
+```bash
+./scripts/bin/run-sl -d --name=sl2 \
+--network=host-1-net \
+--host-ip=${HOST_IP} \
+--sn-ip=${SN_IP} \
+--sn-api-port=${SN_API_PORT} \
+--sl-fs-port=17000 \
+--key=workspace/fashion-mnist/cert/sl-2-key.pem \
+--cert=workspace/fashion-mnist/cert/sl-2-cert.pem \
+--capath=workspace/fashion-mnist/cert/ca/capath \
+--ml-image=fashion-ml-env \
+--ml-name=ml2 \
+--ml-entrypoint=python3 \
+--ml-cmd=/tmp/test/model/fashion-mnist_snr.py \
+-v ~/swarm-learning/workspace/fashion-mnist/tmp/sl2:/tmp/hpe-swarm \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch:/tmp/scratch \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/model:/tmp/test/model \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/results:/results \
+--ml-e DATA_DIR=/app-data \
+--ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp_snr_cascaded_dp_sl2.json \
+--ml-e MIN_PEERS=2 \
+--ml-e MAX_EPOCHS=50 \
+--ml-e NODE_ID=1 \
+--ml-e NUM_NODES=2 \
+--ml-e OPTIMIZER=adam \
+--ml-e LEARNING_RATE=0.001 \
+--ml-e DP_ENABLED=true \
+--ml-e NOISE_MULTIPLIER=0.5 \
+--ml-e L2_NORM_CLIP=1.0 \
+--ml-e MICROBATCHES=32 \
+--ml-e CASCADED_DP=true \
+--ml-e SNR_THRESHOLD=1.0 \
+--ml-e DP_DROP_WINDOW=5 \
+--ml-e MIN_DP_EPOCHS=5 \
+--apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml2 > \
+~/swarm-learning/workspace/fashion-mnist/results/exp_snr_cascaded_dp_ml2.log 2>&1 &
+```
+
+---
+
+## Additional Parameters Used
+
+| Parameter        | Value                    |
+|------------------|--------------------------|
+| CASCADED_DP      | true                     |
+| SNR_THRESHOLD    | 1.0                      |
+| DP_DROP_WINDOW   | 5                        |
+| MIN_DP_EPOCHS    | 5                        |
+| NOISE_MULTIPLIER | 0.5                      |
+| L2_NORM_CLIP     | 1.0                      |
+| MODEL FILE       | fashion-mnist_snr.py     |
+
+### Description
+
+* SNR-Gated Cascaded DP begins training with Differential Privacy enabled using DP-Adam.
+* Each epoch, the callback computes the **Signal-to-Noise Ratio (SNR)**:
+  `SNR = grad_norm / noise_std`, where `noise_std = (L2_NORM_CLIP × NOISE_MULTIPLIER) / √batch_size`.
+* After a minimum warm-up period (`MIN_DP_EPOCHS`), the rolling mean SNR over the last `DP_DROP_WINDOW` epochs is evaluated.
+* When `rolling_SNR < SNR_THRESHOLD` (default `1.0`), DP noise is dominating the gradient signal — the node casts a drop vote to the shared scratch directory.
+* Once **all nodes** have voted (strict quorum), every node simultaneously drops the DP optimizer and recompiles with a standard Adam optimizer, allowing clean fine-tuning for the remaining epochs.
+* The privacy budget (ε) is computed only for the epochs during which DP was actually active.
+* This approach automatically drops DP at the point where it becomes statistically counter-productive, rather than relying on manually tuned slope or accuracy thresholds.
+
+---
+
 # Notes
 
 - TensorFlow version: `2.7.0`

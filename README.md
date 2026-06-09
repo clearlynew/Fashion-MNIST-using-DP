@@ -398,6 +398,10 @@ All JSON metrics + logs are automatically saved inside:
 | `MAX_EPOCHS` | Training epochs |
 | `OPTIMIZER` | SGD or Adam |
 | `RESULT_FILE` | Output JSON filename |
+| `CASCADED_DP` | Enable SNR plateau-gated DP drop |
+| `SNR_PLATEAU_EPS` | Drop DP when epoch-over-epoch relative SNR change < this (default `0.02`) |
+| `DP_DROP_WINDOW` | Rolling window size for SNR averaging |
+| `MIN_DP_EPOCHS` | Minimum epochs before DP drop is evaluated |
 
 ---
 
@@ -696,7 +700,7 @@ chmod 777 ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch
 --ml-e L2_NORM_CLIP=1.0 \
 --ml-e MICROBATCHES=32 \
 --ml-e CASCADED_DP=true \
---ml-e SNR_THRESHOLD=1.0 \
+--ml-e SNR_PLATEAU_EPS=0.02 \
 --ml-e DP_DROP_WINDOW=5 \
 --ml-e MIN_DP_EPOCHS=5 \
 --apls-ip=${APLS_IP}
@@ -745,7 +749,7 @@ docker logs -f ml1 > \
 --ml-e L2_NORM_CLIP=1.0 \
 --ml-e MICROBATCHES=32 \
 --ml-e CASCADED_DP=true \
---ml-e SNR_THRESHOLD=1.0 \
+--ml-e SNR_PLATEAU_EPS=0.02 \
 --ml-e DP_DROP_WINDOW=5 \
 --ml-e MIN_DP_EPOCHS=5 \
 --apls-ip=${APLS_IP}
@@ -765,7 +769,7 @@ docker logs -f ml2 > \
 | Parameter        | Value                    |
 |------------------|--------------------------|
 | CASCADED_DP      | true                     |
-| SNR_THRESHOLD    | 1.0                      |
+| SNR_PLATEAU_EPS  | 0.02                     |
 | DP_DROP_WINDOW   | 5                        |
 | MIN_DP_EPOCHS    | 5                        |
 | NOISE_MULTIPLIER | 0.5                      |
@@ -777,11 +781,12 @@ docker logs -f ml2 > \
 * SNR-Gated Cascaded DP begins training with Differential Privacy enabled using DP-Adam.
 * Each epoch, the callback computes the **Signal-to-Noise Ratio (SNR)**:
   `SNR = grad_norm / noise_std`, where `noise_std = (L2_NORM_CLIP × NOISE_MULTIPLIER) / √batch_size`.
-* After a minimum warm-up period (`MIN_DP_EPOCHS`), the rolling mean SNR over the last `DP_DROP_WINDOW` epochs is evaluated.
-* When `rolling_SNR < SNR_THRESHOLD` (default `1.0`), DP noise is dominating the gradient signal — the node casts a drop vote to the shared scratch directory.
+* After a minimum warm-up period (`MIN_DP_EPOCHS`), the **relative change in SNR** is evaluated:
+  `Δ_rel(SNR) = |SNR_now - SNR_prev| / SNR_prev`.
+* When `Δ_rel(SNR) < SNR_PLATEAU_EPS` (default `0.02`), the SNR has plateaued — the node casts a drop vote to the shared scratch directory.
+* This trigger is **dimensionless and self-calibrating**: it does not depend on the absolute SNR value, so it works across architectures and hyperparameter sets without re-tuning.
 * Once **all nodes** have voted (strict quorum), every node simultaneously drops the DP optimizer and recompiles with a standard Adam optimizer, allowing clean fine-tuning for the remaining epochs.
 * The privacy budget (ε) is computed only for the epochs during which DP was actually active.
-* This approach automatically drops DP at the point where it becomes statistically counter-productive, rather than relying on manually tuned slope or accuracy thresholds.
 
 ---
 

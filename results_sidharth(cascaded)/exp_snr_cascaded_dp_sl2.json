@@ -1,0 +1,58 @@
+{
+  "config": {
+    "dp_enabled": true,
+    "cascaded_dp": true,
+    "auto_tuned": false,
+    "noise_multiplier": 0.5,
+    "l2_norm_clip": 1.0,
+    "microbatches": 32,
+    "optimizer": "adam",
+    "learning_rate": 0.001,
+    "epochs": 50,
+    "node_id": 1,
+    "num_nodes": 2
+  },
+  "privacy": {
+    "epsilon": 7.2295,
+    "delta": 3.3333333333333335e-05,
+    "dp_drop_epoch": 17,
+    "snr_plateau_eps": 0.02,
+    "dp_drop_reason": {
+      "epoch": 17,
+      "snr_plateau_eps": 0.02,
+      "snr_rel_change": 0.10423180107512663,
+      "rolling_snr": 45.20566695254831,
+      "noise_std": 0.08838834764831843,
+      "snr_history": [
+        23.10231851583604,
+        25.964452329797727,
+        29.51395498259117,
+        33.68275924643632,
+        34.87978477107112,
+        38.710828641657166,
+        42.942543247203446,
+        39.21542204110248,
+        41.070410716950384,
+        40.92344350979861,
+        43.598496566939716,
+        51.07527789989606,
+        46.193870636078714,
+        44.95851238413586,
+        48.82183143465709,
+        45.3927438790633,
+        40.661376428806605
+      ]
+    }
+  },
+  "results": {
+    "loss": 0.3265,
+    "accuracy": 0.8851,
+    "f1_score": 0.8852
+  },
+  "timing": {
+    "training_time_seconds": 1544.38,
+    "training_time_minutes": 25.74
+  },
+  "auto_tune_report": null,
+  "adaptive_summary": null
+}

@@ -10,7 +10,8 @@
 ##
 ##   CASCADED_DP=true           → enable SNR-based DP drop (CascadedDPCallback)
 ##   SNR_PLATEAU_EPS=0.02       → drop DP when SNR relative change < this (2% default)
-##   DP_DROP_WINDOW=5           → rolling window size for SNR averaging
+##   ACC_PLATEAU_EPS=0.005      → drop DP when accuracy relative change < this (0.5% default)
+##   DP_DROP_WINDOW=5           → rolling window size for SNR/accuracy averaging
 ##   MIN_DP_EPOCHS=5            → minimum epochs before DP drop is evaluated
 ##   NODE_ID=0                  → this node's integer ID (0-indexed)
 ##   NUM_NODES=2                → total number of swarm nodes
@@ -50,20 +51,16 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
     Drops differential privacy across ALL swarm nodes simultaneously using a
     fully decentralized Quorum-based Peer Consensus mechanism.
 
-    Drop criterion: SNR plateau — the epoch-over-epoch relative change in SNR
-    falls below snr_plateau_eps.
+    Drop criterion: DUAL plateau — both SNR and validation accuracy must plateau
+    before a node casts its vote.
 
         SNR         =  mean_grad_norm  /  noise_std
         Δ_rel(SNR)  =  |SNR_now - SNR_prev| / SNR_prev
+        Δ_rel(acc)  =  |acc_now  - acc_prev| / acc_prev
 
-    where  noise_std = l2_norm_clip * noise_multiplier / sqrt(batch_size)
-    is the effective per-parameter DP noise injected by the DP optimizer.
-
-    Using a relative change rate instead of a fixed threshold makes the
-    trigger self-calibrating: it fires when SNR has stopped evolving
-    (plateaued — rising or falling), regardless of what the absolute SNR
-    value is, so it works across architectures and hyperparameter sets
-    without re-tuning.
+    Both relative-change rates are dimensionless, making the trigger
+    self-calibrating across architectures and hyperparameter sets.
+    DP is only dropped when BOTH signals have stopped evolving.
     """
 
     def __init__(
@@ -79,6 +76,7 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         learning_rate=0.01,
         window_size=5,
         snr_plateau_eps=0.02,
+        acc_plateau_eps=0.005,
         min_dp_epochs=5,
     ):
         super().__init__()
@@ -94,6 +92,7 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         self.learning_rate    = learning_rate
         self.window_size      = window_size
         self.snr_plateau_eps  = snr_plateau_eps   # relative change threshold (dimensionless)
+        self.acc_plateau_eps  = acc_plateau_eps   # accuracy relative change threshold
         self.min_dp_epochs    = min_dp_epochs
 
         # Pre-compute the effective DP noise standard deviation
@@ -103,11 +102,14 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         # Tracking windows
         self.grad_norm_window = deque(maxlen=window_size)
         self.snr_window       = deque(maxlen=window_size)
+        self.acc_window       = deque(maxlen=window_size)
 
         # Telemetry history
-        self.grad_history      = []
-        self.snr_history       = []
-        self.snr_rel_ch_history = []   # relative change history for diagnostics
+        self.grad_history       = []
+        self.snr_history        = []
+        self.acc_history        = []
+        self.snr_rel_ch_history = []   # relative SNR change history for diagnostics
+        self.acc_rel_ch_history = []   # relative accuracy change history for diagnostics
 
         self.dp_active      = True
         self.dp_drop_epoch  = None
@@ -141,13 +143,15 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
             norms.append(float(grad_norm))
         return float(np.mean(norms))
 
-    def _drop_dp(self, epoch, snr_rel_change):
+    def _drop_dp(self, epoch, snr_rel_change, acc_rel_change):
         """Swap to a standard (non-DP) optimizer, recompile, and rebuild the runtime graph."""
 
         print(f"\n***** CascadedDP: [Node {self.node_id}] SWARM QUORUM UNLOCKED *****")
         print(
-            f"***** CascadedDP: SNR plateaued (Δ_rel={snr_rel_change:.4f} "
-            f"< {self.snr_plateau_eps}) — dropping DP at epoch {epoch + 1} *****"
+            f"***** CascadedDP: DUAL plateau detected — "
+            f"SNR Δ_rel={snr_rel_change:.4f} < {self.snr_plateau_eps} AND "
+            f"Acc Δ_rel={acc_rel_change:.4f} < {self.acc_plateau_eps} "
+            f"— dropping DP at epoch {epoch + 1} *****"
         )
 
         if self.optimizer_type == 'adam':
@@ -182,10 +186,14 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         self.dp_drop_reason = {
             "epoch":            epoch + 1,
             "snr_plateau_eps":  self.snr_plateau_eps,
+            "acc_plateau_eps":  self.acc_plateau_eps,
             "snr_rel_change":   snr_rel_change,
+            "acc_rel_change":   acc_rel_change,
             "rolling_snr":      float(np.mean(self.snr_window)),
+            "rolling_acc":      float(np.mean(self.acc_window)),
             "noise_std":        self.noise_std,
             "snr_history":      self.snr_history[:],
+            "acc_history":      self.acc_history[:],
         }
 
         print(f"***** CascadedDP: low-level execution graphs forcefully rebuilt *****")
@@ -197,56 +205,88 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         if not self.dp_active:
             return
 
+        logs = logs or {}
+
         grad_norm = self._compute_grad_norm()
 
         # SNR = signal (gradient norm) / noise (effective DP noise std)
         snr = grad_norm / self.noise_std if self.noise_std > 0 else float('inf')
 
+        # Validation accuracy from Keras logs (val_accuracy or val_categorical_accuracy)
+        acc = logs.get('val_accuracy', logs.get('val_categorical_accuracy', None))
+        if acc is None:
+            # Fallback: evaluate on a single batch
+            for x_b, y_b in self.val_ds.take(1):
+                _, acc = self.model.evaluate(x_b, y_b, verbose=0)
+        acc = float(acc)
+
         self.grad_norm_window.append(grad_norm)
         self.snr_window.append(snr)
+        self.acc_window.append(acc)
 
         self.grad_history.append(float(grad_norm))
         self.snr_history.append(float(snr))
+        self.acc_history.append(acc)
 
         rolling_snr = float(np.mean(self.snr_window))
+        rolling_acc = float(np.mean(self.acc_window))
 
         # Relative SNR change: |SNR_now - SNR_prev| / SNR_prev
-        # Only meaningful once we have at least 2 history points
         if len(self.snr_history) >= 2:
-            prev_snr    = self.snr_history[-2]
+            prev_snr       = self.snr_history[-2]
             snr_rel_change = abs(snr - prev_snr) / prev_snr if prev_snr > 0 else 1.0
         else:
-            snr_rel_change = 1.0   # no plateau yet
+            snr_rel_change = 1.0
+
+        # Relative accuracy change: |acc_now - acc_prev| / acc_prev
+        if len(self.acc_history) >= 2:
+            prev_acc       = self.acc_history[-2]
+            acc_rel_change = abs(acc - prev_acc) / prev_acc if prev_acc > 0 else 1.0
+        else:
+            acc_rel_change = 1.0
 
         self.snr_rel_ch_history.append(float(snr_rel_change))
+        self.acc_rel_ch_history.append(float(acc_rel_change))
+
+        snr_plateaued = snr_rel_change < self.snr_plateau_eps
+        acc_plateaued = acc_rel_change < self.acc_plateau_eps
 
         print(
             f"  [CascadedDP] Node={self.node_id} | epoch={epoch + 1} | "
             f"grad_norm={grad_norm:.6f} | noise_std={self.noise_std:.6f} | "
             f"SNR={snr:.4f} | rolling_SNR={rolling_snr:.4f} | "
-            f"Δ_rel(SNR)={snr_rel_change:.4f} (plateau_eps={self.snr_plateau_eps})"
+            f"Δ_rel(SNR)={snr_rel_change:.4f} ({'✓ PLATEAU' if snr_plateaued else '…'}) | "
+            f"acc={acc:.4f} | rolling_acc={rolling_acc:.4f} | "
+            f"Δ_rel(acc)={acc_rel_change:.4f} ({'✓ PLATEAU' if acc_plateaued else '…'})"
         )
 
         # 1. Minimum-epochs guard
         if epoch + 1 < self.min_dp_epochs or len(self.snr_window) < self.window_size:
             return
 
-        # 2. Local plateau check: SNR has stopped changing relative to its own scale
-        #    This is dimensionless — works regardless of absolute SNR value or architecture
-        if snr_rel_change < self.snr_plateau_eps:
+        # 2. Local plateau check: BOTH SNR and accuracy must have plateaued
+        if snr_plateaued and acc_plateaued:
             if not os.path.exists(self.vote_file):
                 try:
                     with open(self.vote_file, 'w') as f:
                         f.write(
                             f"Node {self.node_id} voted at epoch {epoch + 1} "
-                            f"| Δ_rel(SNR)={snr_rel_change:.4f} < {self.snr_plateau_eps}"
+                            f"| Δ_rel(SNR)={snr_rel_change:.4f} < {self.snr_plateau_eps} "
+                            f"| Δ_rel(acc)={acc_rel_change:.4f} < {self.acc_plateau_eps}"
                         )
                     print(
                         f"  [CascadedDP-Consensus] Node {self.node_id} posted drop-DP vote "
-                        f"(Δ_rel(SNR)={snr_rel_change:.4f} < eps={self.snr_plateau_eps})."
+                        f"(SNR plateaued AND accuracy plateaued)."
                     )
                 except Exception as e:
                     print(f"  [CascadedDP-Consensus] Error writing vote file: {e}")
+        else:
+            missing = []
+            if not snr_plateaued:
+                missing.append(f"SNR Δ_rel={snr_rel_change:.4f} ≥ {self.snr_plateau_eps}")
+            if not acc_plateaued:
+                missing.append(f"Acc Δ_rel={acc_rel_change:.4f} ≥ {self.acc_plateau_eps}")
+            print(f"  [CascadedDP-Consensus] Not voting yet — {' | '.join(missing)}")
 
         # 3. Scan shared scratch volume for all peer votes
         total_votes = sum(
@@ -265,7 +305,7 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         if total_votes == self.num_nodes:
             # Stagger drops slightly to avoid file-system race conditions
             time.sleep(self.node_id * 0.2)
-            self._drop_dp(epoch, snr_rel_change)
+            self._drop_dp(epoch, snr_rel_change, acc_rel_change)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -351,7 +391,8 @@ def main():
 
     # CascadedDP (SNR plateau-gated) flags
     cascadedDp    = os.getenv('CASCADED_DP', 'false').lower() == 'true'
-    snrPlateauEps = float(os.getenv('SNR_PLATEAU_EPS', '0.02'))  # relative change threshold
+    snrPlateauEps = float(os.getenv('SNR_PLATEAU_EPS', '0.02'))   # relative SNR change threshold
+    accPlateauEps = float(os.getenv('ACC_PLATEAU_EPS', '0.005'))  # relative accuracy change threshold
     dpDropWindow  = int(os.getenv('DP_DROP_WINDOW', '5'))
     minDpEpochs   = int(os.getenv('MIN_DP_EPOCHS', '5'))
 
@@ -516,11 +557,13 @@ def main():
             learning_rate    = actual_lr,
             window_size      = dpDropWindow,
             snr_plateau_eps  = snrPlateauEps,
+            acc_plateau_eps  = accPlateauEps,
             min_dp_epochs    = minDpEpochs,
         )
         callbacks.append(cascadedDpCallback)
         print(
             f"  [CascadedDP] Enabled | SNR_PLATEAU_EPS={snrPlateauEps} | "
+            f"ACC_PLATEAU_EPS={accPlateauEps} | "
             f"window={dpDropWindow} | min_epochs={minDpEpochs} | "
             f"noise_std={cascadedDpCallback.noise_std:.6f}"
         )
@@ -632,6 +675,7 @@ def main():
             "delta":            float(1.0 / num_train_samples) if dpEnabled else None,
             "dp_drop_epoch":    cascadedDpCallback.dp_drop_epoch if cascadedDpCallback else None,
             "snr_plateau_eps":  snrPlateauEps if cascadedDp else None,
+            "acc_plateau_eps":  accPlateauEps if cascadedDp else None,
             "dp_drop_reason":   cascadedDpCallback.dp_drop_reason if cascadedDpCallback else None,
         },
 

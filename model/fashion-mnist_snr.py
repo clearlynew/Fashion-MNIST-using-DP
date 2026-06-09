@@ -9,7 +9,7 @@
 ##   DP_ADAPTIVE_CALLBACK=true  → enable self-healing mid-training adjustments
 ##
 ##   CASCADED_DP=true           → enable SNR-based DP drop (CascadedDPCallback)
-##   SNR_THRESHOLD=1.0          → drop DP when SNR falls below this value
+##   SNR_PLATEAU_EPS=0.02       → drop DP when SNR relative change < this (2% default)
 ##   DP_DROP_WINDOW=5           → rolling window size for SNR averaging
 ##   MIN_DP_EPOCHS=5            → minimum epochs before DP drop is evaluated
 ##   NODE_ID=0                  → this node's integer ID (0-indexed)
@@ -50,16 +50,20 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
     Drops differential privacy across ALL swarm nodes simultaneously using a
     fully decentralized Quorum-based Peer Consensus mechanism.
 
-    Drop criterion: Signal-to-Noise Ratio (SNR) < snr_threshold
+    Drop criterion: SNR plateau — the epoch-over-epoch relative change in SNR
+    falls below snr_plateau_eps.
 
-        SNR  =  mean_grad_norm  /  noise_std
+        SNR         =  mean_grad_norm  /  noise_std
+        Δ_rel(SNR)  =  |SNR_now - SNR_prev| / SNR_prev
 
     where  noise_std = l2_norm_clip * noise_multiplier / sqrt(batch_size)
     is the effective per-parameter DP noise injected by the DP optimizer.
 
-    When SNR < 1, the DP noise dominates the gradient signal — the optimizer
-    is learning through pure noise, so DP is counter-productive and should
-    be dropped so fine-tuning can proceed cleanly.
+    Using a relative change rate instead of a fixed threshold makes the
+    trigger self-calibrating: it fires when SNR has stopped evolving
+    (plateaued — rising or falling), regardless of what the absolute SNR
+    value is, so it works across architectures and hyperparameter sets
+    without re-tuning.
     """
 
     def __init__(
@@ -74,7 +78,7 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         optimizer_type='sgd',
         learning_rate=0.01,
         window_size=5,
-        snr_threshold=1.0,
+        snr_plateau_eps=0.02,
         min_dp_epochs=5,
     ):
         super().__init__()
@@ -89,7 +93,7 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         self.optimizer_type   = optimizer_type
         self.learning_rate    = learning_rate
         self.window_size      = window_size
-        self.snr_threshold    = snr_threshold
+        self.snr_plateau_eps  = snr_plateau_eps   # relative change threshold (dimensionless)
         self.min_dp_epochs    = min_dp_epochs
 
         # Pre-compute the effective DP noise standard deviation
@@ -101,8 +105,9 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         self.snr_window       = deque(maxlen=window_size)
 
         # Telemetry history
-        self.grad_history  = []
-        self.snr_history   = []
+        self.grad_history      = []
+        self.snr_history       = []
+        self.snr_rel_ch_history = []   # relative change history for diagnostics
 
         self.dp_active      = True
         self.dp_drop_epoch  = None
@@ -129,18 +134,21 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         norms = []
         for x, y in self.val_ds.take(5):
             with tf.GradientTape() as tape:
-                preds    = self.model(x, training=True)
+                preds    = self.model(x, training=False)
                 loss_val = self._measure_loss(y, preds)
             grads     = tape.gradient(loss_val, self.model.trainable_variables)
             grad_norm = tf.linalg.global_norm(grads).numpy()
             norms.append(float(grad_norm))
         return float(np.mean(norms))
 
-    def _drop_dp(self, epoch):
+    def _drop_dp(self, epoch, snr_rel_change):
         """Swap to a standard (non-DP) optimizer, recompile, and rebuild the runtime graph."""
 
         print(f"\n***** CascadedDP: [Node {self.node_id}] SWARM QUORUM UNLOCKED *****")
-        print(f"***** CascadedDP: SNR below threshold — dropping DP at epoch {epoch + 1} *****")
+        print(
+            f"***** CascadedDP: SNR plateaued (Δ_rel={snr_rel_change:.4f} "
+            f"< {self.snr_plateau_eps}) — dropping DP at epoch {epoch + 1} *****"
+        )
 
         if self.optimizer_type == 'adam':
             new_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
@@ -172,11 +180,12 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         self.dp_drop_epoch = epoch + 1
 
         self.dp_drop_reason = {
-            "epoch":          epoch + 1,
-            "snr_threshold":  self.snr_threshold,
-            "rolling_snr":    float(np.mean(self.snr_window)),
-            "noise_std":      self.noise_std,
-            "snr_history":    self.snr_history[:],
+            "epoch":            epoch + 1,
+            "snr_plateau_eps":  self.snr_plateau_eps,
+            "snr_rel_change":   snr_rel_change,
+            "rolling_snr":      float(np.mean(self.snr_window)),
+            "noise_std":        self.noise_std,
+            "snr_history":      self.snr_history[:],
         }
 
         print(f"***** CascadedDP: low-level execution graphs forcefully rebuilt *****")
@@ -201,28 +210,40 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
 
         rolling_snr = float(np.mean(self.snr_window))
 
+        # Relative SNR change: |SNR_now - SNR_prev| / SNR_prev
+        # Only meaningful once we have at least 2 history points
+        if len(self.snr_history) >= 2:
+            prev_snr    = self.snr_history[-2]
+            snr_rel_change = abs(snr - prev_snr) / prev_snr if prev_snr > 0 else 1.0
+        else:
+            snr_rel_change = 1.0   # no plateau yet
+
+        self.snr_rel_ch_history.append(float(snr_rel_change))
+
         print(
             f"  [CascadedDP] Node={self.node_id} | epoch={epoch + 1} | "
             f"grad_norm={grad_norm:.6f} | noise_std={self.noise_std:.6f} | "
-            f"SNR={snr:.4f} | rolling_SNR={rolling_snr:.4f}"
+            f"SNR={snr:.4f} | rolling_SNR={rolling_snr:.4f} | "
+            f"Δ_rel(SNR)={snr_rel_change:.4f} (plateau_eps={self.snr_plateau_eps})"
         )
 
         # 1. Minimum-epochs guard
         if epoch + 1 < self.min_dp_epochs or len(self.snr_window) < self.window_size:
             return
 
-        # 2. Local convergence check: rolling SNR < threshold means noise dominates signal
-        if rolling_snr < self.snr_threshold:
+        # 2. Local plateau check: SNR has stopped changing relative to its own scale
+        #    This is dimensionless — works regardless of absolute SNR value or architecture
+        if snr_rel_change < self.snr_plateau_eps:
             if not os.path.exists(self.vote_file):
                 try:
                     with open(self.vote_file, 'w') as f:
                         f.write(
                             f"Node {self.node_id} voted at epoch {epoch + 1} "
-                            f"| rolling_SNR={rolling_snr:.4f}"
+                            f"| Δ_rel(SNR)={snr_rel_change:.4f} < {self.snr_plateau_eps}"
                         )
                     print(
-                        f"  [CascadedDP-Consensus] Node {self.node_id} posted drop-DP "
-                        f"vote (rolling_SNR={rolling_snr:.4f} < {self.snr_threshold})."
+                        f"  [CascadedDP-Consensus] Node {self.node_id} posted drop-DP vote "
+                        f"(Δ_rel(SNR)={snr_rel_change:.4f} < eps={self.snr_plateau_eps})."
                     )
                 except Exception as e:
                     print(f"  [CascadedDP-Consensus] Error writing vote file: {e}")
@@ -244,7 +265,7 @@ class CascadedDPCallback(tf.keras.callbacks.Callback):
         if total_votes == self.num_nodes:
             # Stagger drops slightly to avoid file-system race conditions
             time.sleep(self.node_id * 0.2)
-            self._drop_dp(epoch)
+            self._drop_dp(epoch, snr_rel_change)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -328,9 +349,9 @@ def main():
     l2NormClip      = float(os.getenv('L2_NORM_CLIP', '1.0'))
     microbatches    = int(os.getenv('MICROBATCHES', str(batchSize)))
 
-    # CascadedDP (SNR-gated) flags
+    # CascadedDP (SNR plateau-gated) flags
     cascadedDp    = os.getenv('CASCADED_DP', 'false').lower() == 'true'
-    snrThreshold  = float(os.getenv('SNR_THRESHOLD', '1.0'))
+    snrPlateauEps = float(os.getenv('SNR_PLATEAU_EPS', '0.02'))  # relative change threshold
     dpDropWindow  = int(os.getenv('DP_DROP_WINDOW', '5'))
     minDpEpochs   = int(os.getenv('MIN_DP_EPOCHS', '5'))
 
@@ -494,12 +515,12 @@ def main():
             optimizer_type   = optimizerType,
             learning_rate    = actual_lr,
             window_size      = dpDropWindow,
-            snr_threshold    = snrThreshold,
+            snr_plateau_eps  = snrPlateauEps,
             min_dp_epochs    = minDpEpochs,
         )
         callbacks.append(cascadedDpCallback)
         print(
-            f"  [CascadedDP] Enabled | SNR threshold={snrThreshold} | "
+            f"  [CascadedDP] Enabled | SNR_PLATEAU_EPS={snrPlateauEps} | "
             f"window={dpDropWindow} | min_epochs={minDpEpochs} | "
             f"noise_std={cascadedDpCallback.noise_std:.6f}"
         )
@@ -610,7 +631,7 @@ def main():
             "epsilon":          round(eps, 4) if eps is not None else None,
             "delta":            float(1.0 / num_train_samples) if dpEnabled else None,
             "dp_drop_epoch":    cascadedDpCallback.dp_drop_epoch if cascadedDpCallback else None,
-            "snr_threshold":    snrThreshold if cascadedDp else None,
+            "snr_plateau_eps":  snrPlateauEps if cascadedDp else None,
             "dp_drop_reason":   cascadedDpCallback.dp_drop_reason if cascadedDpCallback else None,
         },
 

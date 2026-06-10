@@ -70,7 +70,7 @@
 | Standard DP                     | ML1 (Node 0) | Yes | No          | 0.5   | 50     |           1500.08 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |                          N/A |                        N/A |
 | Standard DP                     | ML2 (Node 1) | Yes | No          | 0.5   | 50     |           1499.37 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |                          N/A |                        N/A |
 
-<img width="1935" height="808" alt="comparison_plot(1)" src="https://github.com/user-attachments/assets/70d235fc-89f6-437b-97e2-bb796cbb5fac" />
+<img width="1935" height="838" alt="comparison_plot(2)" src="https://github.com/user-attachments/assets/7088d70d-46a2-4ec1-a7b8-405a77a97eb6" />
 
 
 ---

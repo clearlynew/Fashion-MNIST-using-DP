@@ -222,6 +222,21 @@ No adaptive adjustments were triggered during training.
 | 19    | 0.8138              | 0.5922 → 0.6218 |
 | 20    | 0.8115              | 0.6218 → 0.6529 |
 
+
+
+## Cascaded DP Comparison
+
+
+![Cascaded DP Comparison](./results_sidharth(cascaded)/comparison_plot_cascaded.png)
+
+| Experiment | Accuracy (%) | Training Time (s) | DP Drop Epoch | ε (Epsilon) |
+| --- | ---: | ---: | ---: | ---: |
+| Baseline (No DP) | 89.29 | 769 | N/A | N/A |
+| Standard DP (noise=0.5) | 82.93 | 1500 | N/A | 5.6255 |
+| Cascaded DP (Loose thresholds) | 88.70 | 873 | 7–8 | 5.4473–5.6255 |
+| Cascaded DP (Strict thresholds) | 88.34 | 946 | 13 | 6.5167 |
+| SNR Cascaded DP | 88.76 | 1546 | 15 | 6.8731 |
+
 ---
 
 ## Results (Goutham)

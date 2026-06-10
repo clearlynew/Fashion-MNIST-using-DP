@@ -702,7 +702,7 @@ chmod 777 ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch
 --ml-e MICROBATCHES=32 \
 --ml-e CASCADED_DP=true \
 --ml-e SNR_PLATEAU_EPS=0.02 \
---ml-e ACC_PLATEAU_EPS=0.005 \
+--ml-e ACC_PLATEAU_EPS=0.0005 \
 --ml-e DP_DROP_WINDOW=5 \
 --ml-e MIN_DP_EPOCHS=5 \
 --apls-ip=${APLS_IP}
@@ -752,7 +752,7 @@ docker logs -f ml1 > \
 --ml-e MICROBATCHES=32 \
 --ml-e CASCADED_DP=true \
 --ml-e SNR_PLATEAU_EPS=0.02 \
---ml-e ACC_PLATEAU_EPS=0.005 \
+--ml-e ACC_PLATEAU_EPS=0.0005 \
 --ml-e DP_DROP_WINDOW=5 \
 --ml-e MIN_DP_EPOCHS=5 \
 --apls-ip=${APLS_IP}
@@ -773,7 +773,7 @@ docker logs -f ml2 > \
 |------------------|--------------------------|
 | CASCADED_DP      | true                     |
 | SNR_PLATEAU_EPS  | 0.02                     |
-| ACC_PLATEAU_EPS  | 0.005                    |
+| ACC_PLATEAU_EPS  | 0.0005                   |
 | DP_DROP_WINDOW   | 5                        |
 | MIN_DP_EPOCHS    | 5                        |
 | NOISE_MULTIPLIER | 0.5                      |

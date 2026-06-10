@@ -70,6 +70,12 @@
 | Standard DP                     | ML1 (Node 0) | Yes | No          | 0.5   | 50     |           1500.08 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |                          N/A |                        N/A |
 | Standard DP                     | ML2 (Node 1) | Yes | No          | 0.5   | 50     |           1499.37 |    0.8773 |             82.93 |        82.64 |     10.2567 | 3.33×10⁻⁵ |           N/A |                          N/A |                        N/A |
 
+| Experiment                   | ML Node      | DP  | Cascaded DP | Noise | Epochs | Training Time (s) | Test Loss | Test Accuracy (%) | Macro F1 (%) | ε (Epsilon) | δ (Delta) | DP Drop Epoch | SNR Stability Threshold | Accuracy Plateau Threshold |
+| ---------------------------- | ------------ | --- | ----------- | ----- | ------ | ----------------- | --------- | ----------------- | ------------ | ----------- | --------- | ------------- | ----------------------- | -------------------------- |
+| Cascaded DP (SNR Thresholds) | ML1 (Node 0) | Yes | Yes         | 0.5   | 50     | 949.65            | 0.3252    | 88.57             | 88.50        | 6.6948      | 3.33×10⁻⁵ | 14            | 0.02                    | 0.005                      |
+| Cascaded DP (SNR Thresholds) | ML2 (Node 1) | Yes | Yes         | 0.5   | 50     | 950.46            | 0.3252    | 88.57             | 88.50        | 6.6948      | 3.33×10⁻⁵ | 14            | 0.02                    | 0.005                      |
+
+
 <img width="1935" height="838" alt="comparison_plot(2)" src="https://github.com/user-attachments/assets/7088d70d-46a2-4ec1-a7b8-405a77a97eb6" />
 
 

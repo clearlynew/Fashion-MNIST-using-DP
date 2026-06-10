@@ -76,7 +76,7 @@
 | Cascaded DP (SNR Thresholds) | ML2 (Node 1) | Yes | Yes         | 0.5   | 50     | 950.46            | 0.3252    | 88.57             | 88.50        | 6.6948      | 3.33×10⁻⁵ | 14            | 0.02                    | 0.005                      |
 
 
-<img width="1935" height="838" alt="comparison_plot(2)" src="https://github.com/user-attachments/assets/7088d70d-46a2-4ec1-a7b8-405a77a97eb6" />
+<img width="2385" height="875" alt="comparison_plot_extended" src="https://github.com/user-attachments/assets/ff57e973-7ae7-4211-ba03-8a361ac61e7d" />
 
 
 ---

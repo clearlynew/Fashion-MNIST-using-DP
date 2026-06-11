@@ -288,4 +288,31 @@ The following parameters are fixed:
 | DP-1.0     | SGD       | Yes        | 1.0              | 0.6756  | 3.3333e-05 | 0.9005 | 0.6089   | 0.5530   | 507.77            | 8.46                |
 | DP-3.0     | SGD       | Yes        | 3.0              | 0.1153  | 3.3333e-05 | 1.0116 | 0.5847   | 0.5118   | 389.43            | 6.49                |
 
+## Cascaded DP Experiments and Results
+
+The following parameters are fixed:
+- Microbatches : 32
+- L2 Norm Clip : 1.0
+- Number of epochs : 50
+- Learning Rate: 0.001 (Adam)
+
+### Node 0
+| Experiment              | DP Type        | Noise Multiplier | DP Enabled | Accuracy | F1 Score | Loss   | Epsilon (ε) | Delta (δ) | DP Drop Epoch | Training Time (s) | Training Time (min) |
+| ----------------------- | -------------- | ---------------- | ---------- | -------- | -------- | ------ | ----------- | --------- | ------------- | ----------------- | ------------------- |
+| No DP                   | None           | __               | No         | 0.8885   | 0.8883   | 0.3217 | __          | __        | __            | 789.98            | 13.17               |
+| Cascaded DP (0.5)       | Cascaded       | 0.5              | Yes        | 0.8839   | 0.8824   | 0.3249 | 5.8038      | 3.33e-05  | 9             | 1189.13           | 19.82               |
+| Cascaded DP + SNR (0.5) | Cascaded + SNR | 0.5              | Yes        | 0.8838   | 0.8839   | 0.3323 | 7.6434      | 3.33e-05  | 21            | 1438.27           | 23.97               |
+| Cascaded DP + SNR (0.8) | Cascaded + SNR | 0.8              | Yes        | 0.8817   | 0.8813   | 0.3353 | 1.4776      | 3.33e-05  | 22            | 1527.63           | 25.46               |
+| Dual-Phase Loss (0.8)   | Dual-Phase     | 0.8              | Yes        | 0.8806   | 0.8795   | 0.3304 | 1.4380      | 3.33e-05  | 20            | 1429.87           | 23.83               |
+
+### Node 1
+| Experiment              | DP Type        | Noise Multiplier | DP Enabled | Accuracy | F1 Score | Loss   | Epsilon (ε) | Delta (δ) | DP Drop Epoch | Training Time (s) | Training Time (min) |
+| ----------------------- | -------------- | ---------------- | ---------- | -------- | -------- | ------ | ----------- | --------- | ------------- | ----------------- | ------------------- |
+| No DP                   | None           | __               | No         | 0.8885   | 0.8883   | 0.3217 | __          | __        | __            | 780.23            | 13.00               |
+| Cascaded DP (0.5)       | Cascaded       | 0.5              | Yes        | 0.8839   | 0.8824   | 0.3249 | 5.8038      | 3.33e-05  | 9             | 1163.78           | 19.40               |
+| Cascaded DP + SNR (0.5) | Cascaded + SNR | 0.5              | Yes        | 0.8838   | 0.8839   | 0.3323 | 7.7335      | 3.33e-05  | 22            | 1441.91           | 24.03               |
+| Cascaded DP + SNR (0.8) | Cascaded + SNR | 0.8              | Yes        | 0.8817   | 0.8813   | 0.3353 | 1.4776      | 3.33e-05  | 22            | 1531.79           | 25.53               |
+| Dual-Phase Loss (0.8)   | Dual-Phase     | 0.8              | Yes        | 0.8806   | 0.8795   | 0.3304 | 1.4380      | 3.33e-05  | 20            | 1432.95           | 23.88               |
+
+
 ---

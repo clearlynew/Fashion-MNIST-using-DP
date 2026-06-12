@@ -657,6 +657,77 @@ docker logs -f ml2 > \
 * All swarm nodes coordinate the cutoff decision through a shared scratch directory (`SCRATCH_DIR`) to ensure synchronized DP disabling.
 * The approach aims to improve final accuracy compared with always-on DP while still providing privacy protection during the critical early stages of training.
 
+---
+
+## New Features
+
+### Non-IID Data Partitioning
+
+The enhanced implementation supports multiple data partitioning strategies via:
+
+```bash
+--ml-e PARTITION_MODE=<mode>
+```
+
+Available modes:
+
+| Mode             | Description                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| `iid`            | Uniform distribution across all nodes                       |
+| `noniid_equal`   | Label-skewed distribution with equal sample counts per node |
+| `noniid_unequal` | Unequal sample counts per node with weighted aggregation    |
+
+---
+
+### Label-Skew Non-IID
+
+Enable using:
+
+```bash
+--ml-e PARTITION_MODE=noniid_equal
+```
+
+For a 2-node configuration:
+
+```text
+Node 0: 80% classes 0-4, 20% classes 5-9
+Node 1: 20% classes 0-4, 80% classes 5-9
+```
+
+Both nodes contain the same number of samples.
+
+---
+
+### Unequal-Size Non-IID
+
+Enable using:
+
+```bash
+--ml-e PARTITION_MODE=noniid_unequal
+```
+
+Example (2 nodes):
+
+```text
+Node 0: 48,000 samples
+Node 1: 12,000 samples
+```
+
+Weighted aggregation is automatically enabled:
+
+```text
+Node 0 weight = 80
+Node 1 weight = 20
+```
+
+### Running the Enhanced Version
+
+Use:
+
+```bash
+--ml-cmd=/tmp/test/model/fashion-mnist_nonuniform.py
+```
+
 
 # Example Experiment — SNR-Gated Cascaded DP Adam
 

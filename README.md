@@ -658,10 +658,36 @@ docker logs -f ml2 > \
 * The approach aims to improve final accuracy compared with always-on DP while still providing privacy protection during the critical early stages of training.
 
 ---
+Yes. If you're **not using `PARTITION_MODE=noniid_unequal` in your experiments**, then I would leave the Epoch Barrier out of the paper/report documentation entirely.
+
+The barrier is only there to solve a specific issue:
+
+* Node 0 has ~48k samples
+* Node 1 has ~12k samples
+* Node 1 finishes epochs much faster
+* Cascaded DP could evaluate convergence at different logical epochs on different nodes
+
+If you're only running:
+
+```bash
+PARTITION_MODE=iid
+```
+
+or
+
+```bash
+PARTITION_MODE=noniid_equal
+```
+
+then both nodes have the same amount of data and the barrier is effectively irrelevant.
+
+I would document only the features that are actually part of your experimental evaluation.
+
+---
 
 ## New Features
 
-### Non-IID Data Partitioning
+### Data Partitioning Strategies
 
 The enhanced implementation supports multiple data partitioning strategies via:
 
@@ -671,15 +697,50 @@ The enhanced implementation supports multiple data partitioning strategies via:
 
 Available modes:
 
-| Mode             | Description                                                 |
-| ---------------- | ----------------------------------------------------------- |
-| `iid`            | Uniform distribution across all nodes                       |
-| `noniid_equal`   | Label-skewed distribution with equal sample counts per node |
-| `noniid_unequal` | Unequal sample counts per node with weighted aggregation    |
+| Mode             | Description                                                                   |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `iid`            | Uniform IID partition across all nodes                                        |
+| `noniid_equal`   | Label-skewed distribution with equal sample counts per node                   |
+| `noniid_unequal` | Label-skewed distribution with unequal sample counts and weighted aggregation |
 
 ---
 
-### Label-Skew Non-IID
+### Dirichlet Heterogeneity Control
+
+The IID mode can optionally simulate varying degrees of statistical heterogeneity using a Dirichlet distribution:
+
+```bash
+--ml-e PARTITION_MODE=iid
+--ml-e DIRICHLET_ALPHA=<value>
+```
+
+Available settings:
+
+| Alpha  | Distribution Characteristics |
+| ------ | ---------------------------- |
+| `inf`  | True IID partition           |
+| `1.0`  | Mild heterogeneity           |
+| `0.5`  | Moderate heterogeneity       |
+| `0.1`  | Strong heterogeneity         |
+| `<0.1` | Extreme non-IID behavior     |
+
+Examples:
+
+```bash
+--ml-e DIRICHLET_ALPHA=1.0
+```
+
+Produces near-IID data distributions.
+
+```bash
+--ml-e DIRICHLET_ALPHA=0.1
+```
+
+Produces highly skewed class distributions across swarm nodes.
+
+---
+
+### Label-Skew Non-IID Partitioning
 
 Enable using:
 
@@ -687,18 +748,18 @@ Enable using:
 --ml-e PARTITION_MODE=noniid_equal
 ```
 
-For a 2-node configuration:
+For a two-node swarm:
 
 ```text
-Node 0: 80% classes 0-4, 20% classes 5-9
-Node 1: 20% classes 0-4, 80% classes 5-9
+Node 0: 80% classes 0–4, 20% classes 5–9
+Node 1: 20% classes 0–4, 80% classes 5–9
 ```
 
-Both nodes contain the same number of samples.
+Both nodes contain approximately equal numbers of training samples.
 
 ---
 
-### Unequal-Size Non-IID
+### Unequal-Size Non-IID Partitioning
 
 Enable using:
 
@@ -706,28 +767,34 @@ Enable using:
 --ml-e PARTITION_MODE=noniid_unequal
 ```
 
-Example (2 nodes):
+For a two-node swarm:
 
 ```text
-Node 0: 48,000 samples
-Node 1: 12,000 samples
+Node 0 receives approximately 80% of the training data
+Node 1 receives approximately 20% of the training data
 ```
 
-Weighted aggregation is automatically enabled:
+Resulting in approximately:
+
+```text
+Node 0 ≈ 48,000 samples
+Node 1 ≈ 12,000 samples
+```
+
+---
+
+### Weighted Aggregation
+
+For unequal-size partitions, aggregation weights are automatically adjusted according to local dataset size:
 
 ```text
 Node 0 weight = 80
 Node 1 weight = 20
 ```
 
-### Running the Enhanced Version
+This approximates dataset-size-aware federated averaging, allowing larger nodes to contribute proportionally more to the global model update.
 
-Use:
-
-```bash
---ml-cmd=/tmp/test/model/fashion-mnist_nonuniform.py
-```
-
+---
 
 # Example Experiment — SNR-Gated Cascaded DP Adam
 

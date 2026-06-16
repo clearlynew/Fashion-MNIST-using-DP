@@ -936,6 +936,159 @@ docker logs -f ml2 > \
 * The privacy budget (ε) is computed only for the epochs during which DP was actually active.
 
 ---
+
+# Experiment — SNR-Gated Cascaded DP (Dirichlet IID)
+
+Uses `fashion-mnist_snr.py` with `PARTITION_MODE=iid` and a configurable `DIRICHLET_ALPHA` to control the degree of statistical heterogeneity across nodes.
+
+Set `DIRICHLET_ALPHA` to control data heterogeneity:
+
+| DIRICHLET_ALPHA | Distribution |
+|-----------------|--------------|
+| `inf`           | True IID (uniform equal split) |
+| `1.0`           | Mild heterogeneity |
+| `0.5`           | Moderate heterogeneity |
+| `0.1`           | Strong heterogeneity (near non-IID) |
+
+Before running the SWARM nodes we need to create a shared directory inside the temp directory:
+
+```bash
+mkdir -p ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch
+chmod 777 ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch
+```
+
+## Run SL1
+
+```bash
+./scripts/bin/run-sl -d --name=sl1 \
+--network=host-1-net \
+--host-ip=${HOST_IP} \
+--sn-ip=${SN_IP} \
+--sn-api-port=${SN_API_PORT} \
+--sl-fs-port=16000 \
+--key=workspace/fashion-mnist/cert/sl-1-key.pem \
+--cert=workspace/fashion-mnist/cert/sl-1-cert.pem \
+--capath=workspace/fashion-mnist/cert/ca/capath \
+--ml-image=fashion-ml-env \
+--ml-name=ml1 \
+--ml-entrypoint=python3 \
+--ml-cmd=/tmp/test/model/fashion-mnist_snr.py \
+-v ~/swarm-learning/workspace/fashion-mnist/tmp/sl1:/tmp/hpe-swarm \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch:/tmp/scratch \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/model:/tmp/test/model \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/results:/results \
+--ml-e DATA_DIR=/app-data \
+--ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp_snr_dirichlet_sl1.json \
+--ml-e MIN_PEERS=2 \
+--ml-e MAX_EPOCHS=50 \
+--ml-e NODE_ID=0 \
+--ml-e NUM_NODES=2 \
+--ml-e PARTITION_MODE=iid \
+--ml-e DIRICHLET_ALPHA=0.5 \
+--ml-e OPTIMIZER=adam \
+--ml-e LEARNING_RATE=0.001 \
+--ml-e DP_ENABLED=true \
+--ml-e NOISE_MULTIPLIER=0.5 \
+--ml-e L2_NORM_CLIP=1.0 \
+--ml-e MICROBATCHES=32 \
+--ml-e CASCADED_DP=true \
+--ml-e SNR_PLATEAU_EPS=0.02 \
+--ml-e ACC_PLATEAU_EPS=0.005 \
+--ml-e DP_DROP_WINDOW=5 \
+--ml-e MIN_DP_EPOCHS=5 \
+--apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml1 > \
+~/swarm-learning/workspace/fashion-mnist/results/exp_snr_dirichlet_ml1.log 2>&1 &
+```
+
+---
+
+## Run SL2
+
+```bash
+./scripts/bin/run-sl -d --name=sl2 \
+--network=host-1-net \
+--host-ip=${HOST_IP} \
+--sn-ip=${SN_IP} \
+--sn-api-port=${SN_API_PORT} \
+--sl-fs-port=17000 \
+--key=workspace/fashion-mnist/cert/sl-2-key.pem \
+--cert=workspace/fashion-mnist/cert/sl-2-cert.pem \
+--capath=workspace/fashion-mnist/cert/ca/capath \
+--ml-image=fashion-ml-env \
+--ml-name=ml2 \
+--ml-entrypoint=python3 \
+--ml-cmd=/tmp/test/model/fashion-mnist_snr.py \
+-v ~/swarm-learning/workspace/fashion-mnist/tmp/sl2:/tmp/hpe-swarm \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/tmp/shared_scratch:/tmp/scratch \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/model:/tmp/test/model \
+--ml-v ~/swarm-learning/workspace/fashion-mnist/results:/results \
+--ml-e DATA_DIR=/app-data \
+--ml-e SCRATCH_DIR=/tmp/scratch \
+--ml-e RESULT_FILE=exp_snr_dirichlet_sl2.json \
+--ml-e MIN_PEERS=2 \
+--ml-e MAX_EPOCHS=50 \
+--ml-e NODE_ID=1 \
+--ml-e NUM_NODES=2 \
+--ml-e PARTITION_MODE=iid \
+--ml-e DIRICHLET_ALPHA=0.5 \
+--ml-e OPTIMIZER=adam \
+--ml-e LEARNING_RATE=0.001 \
+--ml-e DP_ENABLED=true \
+--ml-e NOISE_MULTIPLIER=0.5 \
+--ml-e L2_NORM_CLIP=1.0 \
+--ml-e MICROBATCHES=32 \
+--ml-e CASCADED_DP=true \
+--ml-e SNR_PLATEAU_EPS=0.02 \
+--ml-e ACC_PLATEAU_EPS=0.005 \
+--ml-e DP_DROP_WINDOW=5 \
+--ml-e MIN_DP_EPOCHS=5 \
+--apls-ip=${APLS_IP}
+```
+
+Save logs:
+
+```bash
+docker logs -f ml2 > \
+~/swarm-learning/workspace/fashion-mnist/results/exp_snr_dirichlet_ml2.log 2>&1 &
+```
+
+---
+
+## Additional Parameters Used
+
+| Parameter        | Value                |
+|------------------|----------------------|
+| PARTITION_MODE   | iid                  |
+| DIRICHLET_ALPHA  | 0.5 (adjust as needed) |
+| CASCADED_DP      | true                 |
+| SNR_PLATEAU_EPS  | 0.02                 |
+| ACC_PLATEAU_EPS  | 0.005                |
+| DP_DROP_WINDOW   | 5                    |
+| MIN_DP_EPOCHS    | 5                    |
+| NOISE_MULTIPLIER | 0.5                  |
+| L2_NORM_CLIP     | 1.0                  |
+| MODEL FILE       | fashion-mnist_snr.py |
+
+### Description
+
+* Data is partitioned using a Dirichlet distribution controlled by `DIRICHLET_ALPHA`.
+* Lower alpha values produce more skewed class distributions across nodes, simulating non-IID conditions while keeping equal sample counts.
+* Set `DIRICHLET_ALPHA=inf` for true uniform IID (global shuffle + equal split).
+* The SNR-gated dual-plateau mechanism monitors gradient SNR and validation accuracy each epoch and drops DP once both plateau simultaneously across all nodes.
+
+---
+
+
+
+
+
 # Experiment — Dual-Phase Loss Curvature DP (Adam)
 
 Before running the SWARM nodes we need to create a shared directory inside the temp directory:

@@ -3,6 +3,9 @@
 ## Drop-in replacement for your original model.py.
 ##
 ## New env vars:
+##   PARTITION_MODE=iid         → data split strategy: 'iid' | 'noniid_equal' | 'noniid_unequal'
+##   DIRICHLET_ALPHA=inf        → Dirichlet alpha for IID-mode heterogeneity (inf = true IID)
+##
 ##   DP_AUTO_TUNE=true          → enable auto-tuner (overrides NOISE_MULTIPLIER
 ##                                and L2_NORM_CLIP if set)
 ##   DP_TARGET_EPSILON=10.0     → privacy budget the tuner aims for
@@ -18,6 +21,8 @@
 ############################################################################
 
 import os
+import glob
+import pickle
 import json
 import time
 import numpy as np
@@ -40,6 +45,68 @@ from dp_autotuner import DPAutoTuner, DPAdaptiveCallback   # ← new
 batchSize       = 32
 defaultMaxEpoch = 20
 defaultMinPeers = 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EPOCH SYNCHRONIZATION BARRIER (for noniid_unequal)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class EpochBarrierCallback(tf.keras.callbacks.Callback):
+    """
+    Lightweight epoch-level barrier: each node writes a heartbeat file
+    at the END of every epoch, then busy-waits until ALL peers have
+    written that same epoch's heartbeat before proceeding.
+
+    This keeps the fast (small-data) node in lockstep with the slow
+    (large-data) node so the CascadedDP quorum window is always
+    evaluated at the same logical training epoch across the cluster.
+    """
+
+    def __init__(self, node_id, num_nodes, scratch_dir,
+                 poll_interval=2.0, timeout=7200.0):
+        super().__init__()
+        self.node_id       = node_id
+        self.num_nodes     = num_nodes
+        self.scratch_dir   = scratch_dir
+        self.poll_interval = poll_interval   # seconds between fs polls
+        self.timeout       = timeout         # max wait per epoch (safety valve)
+
+        # Clean up stale heartbeats from previous runs
+        for f in glob.glob(os.path.join(scratch_dir, ".epoch_barrier_*")):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
+
+    def _heartbeat_path(self, peer_id, epoch):
+        return os.path.join(
+            self.scratch_dir,
+            f".epoch_barrier_node_{peer_id}_epoch_{epoch}"
+        )
+
+    def on_epoch_end(self, epoch, logs=None):
+        # 1. Announce this node has finished epoch `epoch`
+        hb = self._heartbeat_path(self.node_id, epoch)
+        with open(hb, 'w') as f:
+            f.write(f"node={self.node_id} epoch={epoch} done")
+
+        print(f"  [EpochBarrier] Node {self.node_id} waiting at epoch {epoch + 1} ...")
+
+        # 2. Busy-wait until every peer has written its heartbeat
+        deadline = time.time() + self.timeout
+        while time.time() < deadline:
+            votes = sum(
+                1 for pid in range(self.num_nodes)
+                if os.path.exists(self._heartbeat_path(pid, epoch))
+            )
+            if votes == self.num_nodes:
+                print(f"  [EpochBarrier] All {self.num_nodes} nodes at epoch {epoch + 1} — proceeding.")
+                return
+            time.sleep(self.poll_interval)
+
+        # Timeout is non-fatal; log and continue so training isn't permanently stalled
+        print(f"  [EpochBarrier] WARNING: timeout waiting for peers at epoch {epoch + 1}. Proceeding anyway.")
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -378,6 +445,7 @@ def main():
     learningRate  = float(os.getenv('LEARNING_RATE', '0'))
     nodeId        = int(os.getenv('NODE_ID', '0'))
     numNodes      = int(os.getenv('NUM_NODES', '2'))
+    partitionMode = os.getenv('PARTITION_MODE', 'iid')   # 'iid' | 'noniid_equal' | 'noniid_unequal'
 
     # Auto-tuner flags
     dpAutoTune       = os.getenv('DP_AUTO_TUNE', 'false').lower() == 'true'
@@ -409,19 +477,84 @@ def main():
         tf.keras.datasets.fashion_mnist.load_data()
     )
 
-    # ── Split dataset per node ─────────────────────────────────────────────
+    # ── Partition per node ─────────────────────────────────────────────────
 
-    total_samples = len(x_train)
-    split_size    = total_samples // numNodes
-    start         = nodeId * split_size
-    end           = total_samples if nodeId == numNodes - 1 else start + split_size
+    rng = np.random.default_rng(seed=42)
 
-    x_train = x_train[start:end]
-    y_train = y_train[start:end]
+    if partitionMode == 'noniid_equal':
+        node_idx = []
+        for c in range(10):
+            idx   = np.where(y_train == c)[0]
+            rng.shuffle(idx)
+            split = int(len(idx) * 0.8)
+            if c <= 4:
+                node_idx.extend(idx[:split] if nodeId == 0 else idx[split:])
+            else:
+                node_idx.extend(idx[split:] if nodeId == 0 else idx[:split])
+        node_idx = np.array(node_idx)
+        rng.shuffle(node_idx)
+        x_train = x_train[node_idx]
+        y_train = y_train[node_idx]
 
-    print(f'Node ID: {nodeId} | Total Nodes: {numNodes}')
-    print(f'Training sample range: {start} → {end}')
-    print(f'Local training dataset size: {len(x_train)}')
+    elif partitionMode == 'noniid_unequal':
+        node_idx = []
+        for c in range(10):
+            idx   = np.where(y_train == c)[0]
+            rng.shuffle(idx)
+            split = int(len(idx) * 0.8)
+            node_idx.extend(idx[:split] if nodeId == 0 else idx[split:])
+        node_idx = np.array(node_idx)
+        rng.shuffle(node_idx)
+        x_train = x_train[node_idx]
+        y_train = y_train[node_idx]
+
+    else:  # 'iid' — default
+        # DIRICHLET_ALPHA controls heterogeneity:
+        #   'inf' or unset → true IID (global shuffle, equal split)
+        #   1.0            → mild heterogeneity
+        #   0.5            → moderate heterogeneity
+        #   0.1            → strong heterogeneity (near non-IID)
+        alpha_env = os.getenv('DIRICHLET_ALPHA', 'inf').lower()
+
+        if alpha_env == 'inf':
+            # True IID: global shuffle + contiguous equal split
+            perm    = rng.permutation(len(x_train))
+            x_train = x_train[perm]
+            y_train = y_train[perm]
+
+            split_size = len(x_train) // numNodes
+            start      = nodeId * split_size
+            end        = len(x_train) if nodeId == numNodes - 1 else start + split_size
+            x_train    = x_train[start:end]
+            y_train    = y_train[start:end]
+
+            print(f'***** partition_mode=iid (true IID, alpha=inf) | node={nodeId}')
+
+        else:
+            alpha = float(alpha_env)
+
+            node_idx = [[] for _ in range(numNodes)]
+            for c in range(10):
+                idx = np.where(y_train == c)[0]
+                rng.shuffle(idx)
+
+                proportions = rng.dirichlet(alpha=np.full(numNodes, alpha))
+                splits      = (proportions * len(idx)).astype(int)
+                splits[-1]  = len(idx) - splits[:-1].sum()   # fix rounding
+
+                boundaries = np.concatenate([[0], np.cumsum(splits)])
+                for n in range(numNodes):
+                    node_idx[n].extend(idx[boundaries[n]:boundaries[n + 1]])
+
+            # Trim to equal size across nodes
+            min_size  = min(len(ix) for ix in node_idx)
+            final_idx = np.array(node_idx[nodeId][:min_size])
+            rng.shuffle(final_idx)
+            x_train = x_train[final_idx]
+            y_train = y_train[final_idx]
+
+            print(f'***** partition_mode=iid (Dirichlet alpha={alpha}) | node={nodeId}')
+
     print('-' * 64)
 
     # ── Normalise ──────────────────────────────────────────────────────────
@@ -430,6 +563,13 @@ def main():
     x_test  = x_test  / 255.0
 
     num_train_samples = len(x_train)
+
+    # ── Log class distribution ─────────────────────────────────────────────
+
+    print(f'***** partition_mode={partitionMode} | node={nodeId} | samples={num_train_samples}')
+    unique, counts = np.unique(y_train, return_counts=True)
+    for cls, cnt in zip(unique, counts):
+        print(f'      Class {int(cls):2d}: {int(cnt):5d}')
 
     # ── One-hot encode ─────────────────────────────────────────────────────
 
@@ -528,12 +668,21 @@ def main():
 
     # ── Callbacks ─────────────────────────────────────────────────────────
 
+    if partitionMode == 'noniid_unequal':
+        nodeWeightage = 80 if nodeId == 0 else 20
+    else:
+        nodeWeightage = 50
+
+    largest_node_samples = int(60000 * 0.8)   # 48000
+    steps_per_epoch      = int(np.ceil(largest_node_samples / batchSize))  # 1500
+
     swarmCallback = SwarmCallback(
-        syncFrequency=1024,
+        syncFrequency=steps_per_epoch + 1,
         minPeers=minPeers,
         adsValData=val_ds,
         adsValBatchSize=batchSize,
         mergeMethod='mean',
+        nodeWeightage=nodeWeightage,
         totalEpochs=maxEpoch,
     )
 
@@ -542,6 +691,17 @@ def main():
 
     if adaptive_cb is not None:
         callbacks.append(adaptive_cb)   # ← self-healing DP callback
+
+    # ── Epoch barrier: keeps fast node locked to slow node's pace ──────────
+    # Must be appended BEFORE CascadedDPCallback so the barrier fires first,
+    # ensuring both nodes evaluate the same epoch's gradient stats together.
+    if partitionMode == 'noniid_unequal':
+        barrierCallback = EpochBarrierCallback(
+            node_id=nodeId,
+            num_nodes=numNodes,
+            scratch_dir=scratchDir,
+        )
+        callbacks.append(barrierCallback)
 
     if dpEnabled and cascadedDp:
         actual_lr = learningRate or (0.001 if optimizerType == 'adam' else 0.01)
@@ -657,17 +817,19 @@ def main():
     results = {
 
         "config": {
-            "dp_enabled":       dpEnabled,
-            "cascaded_dp":      cascadedDp,
-            "auto_tuned":       dpAutoTune,
-            "noise_multiplier": final_noise,
-            "l2_norm_clip":     final_clip,
-            "microbatches":     microbatches,
-            "optimizer":        optimizerType,
-            "learning_rate":    learningRate or "default",
-            "epochs":           maxEpoch,
-            "node_id":          nodeId,
-            "num_nodes":        numNodes,
+            "dp_enabled":        dpEnabled,
+            "cascaded_dp":       cascadedDp,
+            "auto_tuned":        dpAutoTune,
+            "noise_multiplier":  final_noise,
+            "l2_norm_clip":      final_clip,
+            "microbatches":      microbatches,
+            "optimizer":         optimizerType,
+            "learning_rate":     learningRate or "default",
+            "epochs":            maxEpoch,
+            "node_id":           nodeId,
+            "num_nodes":         numNodes,
+            "partition_mode":    partitionMode,
+            "num_train_samples": num_train_samples,
         },
 
         "privacy": {

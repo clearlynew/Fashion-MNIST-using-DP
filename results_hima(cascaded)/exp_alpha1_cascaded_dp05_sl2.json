@@ -1,0 +1,44 @@
+{
+  "config": {
+    "model_name": "fashion-mnist",
+    "node_id": 1,
+    "num_nodes": 2,
+    "epochs": 50,
+    "batch_size": 32,
+    "optimizer": "adam",
+    "learning_rate": 0.001,
+    "dp_enabled": true,
+    "cascaded_dp": true,
+    "l2_norm_clip": 1.0,
+    "noise_multiplier": 0.5,
+    "microbatches": 32,
+    "partition_mode": "iid",
+    "num_train_samples": 28476
+  },
+  "performance": {
+    "training_time_seconds": 669.2,
+    "final_test_loss": 0.3373321294784546,
+    "final_test_accuracy": 0.8794000148773193,
+    "final_test_f1_macro": 0.87986633490284
+  },
+  "privacy": {
+    "epsilon": 6.4894,
+    "delta": 3.5117291754459895e-05,
+    "dp_drop_epoch": 12,
+    "dp_slope_threshold": 0.01,
+    "accuracy_plateau_threshold": 0.0005,
+    "dp_drop_reason": {
+      "epoch": 12,
+      "slope_threshold": 0.01,
+      "acc_variance_threshold": 0.0005,
+      "rolling_mean": 6.05733814239502,
+      "val_acc_window": [
+        0.7458999752998352,
+        0.7653999924659729,
+        0.7675999999046326,
+        0.7749000191688538,
+        0.784500002861023
+      ]
+    }
+  }
+}

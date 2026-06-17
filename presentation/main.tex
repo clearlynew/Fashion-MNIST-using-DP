@@ -438,7 +438,7 @@ $\varepsilon$ Consumption & 0              & High              & \textbf{Low} \\
 %--------------------------------------------------
 \begin{frame}{Results: Accuracy Recovery Under CascadedDP ($\alpha = 1.0$)}
 \centering
-\includegraphics[width=0.72\textwidth]{results_section/Accuracy_breakdown.png}
+\includegraphics[width=0.72\textwidth]{results_section/accuracy_breakdown_bar.png}
 \end{frame}
 
 %--------------------------------------------------
@@ -458,7 +458,7 @@ $\varepsilon$ Consumption & 0              & High              & \textbf{Low} \\
 %--------------------------------------------------
 \begin{frame}{Results: Runtime Savings Under CascadedDP ($\alpha = 1.0$)}
 \centering
-\includegraphics[width=0.65\textwidth,height=0.82\textheight,keepaspectratio]{results_section/runtime_breakdown.png}
+\includegraphics[width=0.65\textwidth,height=0.82\textheight,keepaspectratio]{results_section/runtime_breakdown_bar.png}
 \end{frame}
 
 %--------------------------------------------------
@@ -512,12 +512,12 @@ $\varepsilon$ Consumption & 0              & High              & \textbf{Low} \\
 \includegraphics[width=0.78\textwidth,height=0.82\textheight,keepaspectratio]{results_section/runtime_vs_heterogeneity_twin_axis.png}
 \end{frame}
 
-%--------------------------------------------------
+%%--------------------------------------------------
 % Results Slide 6: Observations on Runtime vs. Heterogeneity
 %--------------------------------------------------
 \begin{frame}{Key Observations: Runtime vs. Heterogeneity}
 \begin{itemize}
-    \item The CascadedDP-over-Full-DP runtime saving is consistently large and stable across the heterogeneity sweep: \textbf{42\%} (IID), \textbf{40\%} ($\alpha=1.0$), \textbf{43\%} ($\alpha=0.5$), \textbf{38\%} ($\alpha=0.1$), \textbf{28\%} (Extreme Skew).
+    \item The CascadedDP-over-Full-DP runtime saving is consistently large and stable across the heterogeneity sweep: \textbf{42\%} (IID), \textbf{40\%} ($\alpha=1.0$), \textbf{43\%} ($\alpha=0.5$), \textbf{38\%} ($\alpha=0.1$), and \textbf{22\%} (Extreme Skew).
     \item Absolute runtimes fall toward $\alpha = 0.1$ for \emph{all three} methods -- this tracks the samples-per-node axis shown above the plot (\textbf{30{,}000 $\rightarrow$ 20{,}160}), a side effect of Dirichlet min-cut equalization, not heterogeneity itself.
     \item Because all three curves shrink together, the \emph{relative} CascadedDP advantage is preserved even though the \emph{absolute} numbers are confounded by shrinking dataset size at low $\alpha$.
     \item Extreme Skew uses a different, label-exclusive partitioning (5 classes/node, no Dirichlet trimming) and returns to full 30{,}000-sample volume -- explaining the runtime rebound at the right edge of the plot.
@@ -539,8 +539,30 @@ $\varepsilon$ Consumption & 0              & High              & \textbf{Low} \\
 \begin{itemize}
     \item CascadedDP tracks the No~DP baseline closely from IID through $\alpha = 0.5$ (within 0.5 points), while Full~DP degrades sharply over the same range ($82.8\% \rightarrow 71.3\%$).
     \item All three methods drop together at $\alpha = 0.1$ -- this coincides with the smallest samples-per-node point (\textbf{20{,}160}), so part of this dip is a data-volume effect layered on top of heterogeneity, not heterogeneity alone.
-    \item At Extreme Skew, Full~DP (\textbf{76.42\%}) slightly outperforms CascadedDP (\textbf{74.11\%}) -- the only point in the sweep where early DP removal underperforms. This may indicate the quorum-based drop trigger fires prematurely under complete label exclusivity, worth further investigation.
-    \item Overall takeaway: CascadedDP's accuracy advantage over Full~DP is robust across realistic heterogeneity regimes, with one identified edge case under maximal label skew.
+    \item At Extreme Skew, CascadedDP (\textbf{75.43\%}) underperforms Full~DP (\textbf{77.26\%}) by a small margin (1.83\%), remaining close to the No~DP baseline (\textbf{77.43\%}). This might hint at an early convergence due to local gradients converging.
+    \item Overall takeaway: CascadedDP's accuracy advantage over Full~DP is robust across realistic heterogeneity regimes ($\alpha \ge 0.5$), with a narrow trade-off profile discovered under maximal label skew.
+\end{itemize}
+\end{frame}
+%--------------------------------------------------
+% Results Slide 9: 2D Heterogeneity Matrix Plot
+%--------------------------------------------------
+\begin{frame}{Empirical Validation: 2D Heterogeneity Matrix}
+\begin{center}
+    \includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{results_section/matrix_graph.png}
+\end{center}
+\end{frame}
+%--------------------------------------------------
+% Results Slide 10: Analysis of Cross-Skew Profiles
+%--------------------------------------------------
+\begin{frame}{Deep Dive: Dissecting Partition Skews}
+\begin{itemize}
+    \item \textbf{Quantity Skew:} Mitigates straggler overhead; drops Full~DP peak runtime ($1639\,\text{s} \rightarrow 1016\,\text{s}$) while retaining $86.65\%$ accuracy.
+    
+    \item \textbf{Label Skew:} High standalone robustness; matches No~DP baseline accuracy ($88.28\%$ vs. $88.36\%$) and slashes runtime by $460\,\text{s}$ ($1179\,\text{s} \rightarrow 718\,\text{s}$).
+    
+    \item \textbf{Combined Skew:} Dual skew anomalies scale additively rather than compounding multiplicatively.
+    
+    \item \textbf{Core Takeaway:} Robust middle ground—remains within $1\text{--}2\%$ of the No~DP utility ceiling with a consistent $33\%\text{--}40\%$ runtime reduction over Full~DP.
 \end{itemize}
 \end{frame}
 %--------------------------------------------------
@@ -551,14 +573,13 @@ $\varepsilon$ Consumption & 0              & High              & \textbf{Low} \\
     Our evaluation of \textbf{CascadedDP} demonstrates that privacy does not require permanent utility degradation. By bounding the DP-Adam overhead strictly to early training phases, we achieve a near-baseline accuracy recovery (\textbf{87.94\%}) alongside a structural \textbf{40\% runtime reduction}.
 \end{block}
 
-\vspace{0.2cm}
+\vspace{0.1cm}
 \textbf{Key Takeaways:}
 \begin{itemize}
-    \item \textbf{Robustness:} The relative performance and efficiency advantages hold steady across various non-IID and Dirichlet data heterogeneity configurations.
+    \item \textbf{Robustness:} Advantages hold steady across Dirichlet regimes and orthogonal skews, maintaining a highly resilient trade-off profile.
     \item \textbf{Decentralized Security:} The quorum-based voting mechanism ensures that fast-converging nodes cannot drop protection prematurely or expose slower peers.
 \end{itemize}
 \end{frame}
-
 %--------------------------------------------------
 % Thank You Slide
 %--------------------------------------------------

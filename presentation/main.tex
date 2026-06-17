@@ -1,4 +1,4 @@
-\documentclass[aspectratio=169]{beamer}
+]\documentclass[aspectratio=169]{beamer}
 \usepackage{amsmath,booktabs,graphicx}
 \usetheme{Madrid}
 
@@ -155,9 +155,6 @@ Applying DP throughout \emph{all} training epochs:
 \end{itemize}
 \end{block}
 \end{columns}
-
-\vspace{0.4cm}
-\centering
 \end{frame}
 
 %--------------------------------------------------
@@ -247,4 +244,140 @@ $\varepsilon$ Consumption & 0              & High              & \textbf{Low} \\
 \end{itemize}
 \end{frame}
 
+
+% --- Hima --- Results --- %
+%--------------------------------------------------
+% Results Slide 1: Accuracy Breakdown (alpha = 1.0)
+%--------------------------------------------------
+\begin{frame}{Results: Accuracy Recovery Under CascadedDP ($\alpha = 1.0$)}
+\centering
+\includegraphics[width=0.72\textwidth]{results_section/Accuracy_breakdown.png}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 2: Observations on Accuracy Breakdown
+%--------------------------------------------------
+\begin{frame}{Key Observations: Accuracy Breakdown}
+\begin{itemize}
+    \item CascadedDP closes most of the privacy--utility gap: the final test accuracy of \textbf{87.94\%} sits within 0.5 points of the No~DP baseline (\textbf{88.44\%}), versus a 5.5-point gap for Full~DP (\textbf{82.93\%}).
+    \item The Stage~1 dip to \textbf{77.50\%} reflects the cost of active DP noise during the privacy-protected phase (epochs 1--12) -- this is the expected, bounded trade-off, not a failure mode.
+    \item Stage~2 shows the model recovering sharply once DP is dropped, climbing from 77.50\% to \textbf{85.47\%} on validation and \textbf{87.94\%} on the held-out test set.
+    \item This confirms the core hypothesis: stabilized gradients before the drop point imply diminishing marginal sensitivity, so continued DP overhead after convergence is unjustified.
+\end{itemize}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 3: Runtime Breakdown (alpha = 1.0)
+%--------------------------------------------------
+\begin{frame}{Results: Runtime Savings Under CascadedDP ($\alpha = 1.0$)}
+\centering
+\includegraphics[width=0.65\textwidth,height=0.82\textheight,keepaspectratio]{results_section/runtime_breakdown.png}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 4: Observations on Runtime Breakdown
+%--------------------------------------------------
+\begin{frame}{Key Observations: Runtime Breakdown}
+\begin{itemize}
+    \item CascadedDP completes training in \textbf{673s} total, a \textbf{40\% reduction} versus Full~DP's \textbf{1130s} -- while only adding \textbf{29\%} over the No~DP baseline of \textbf{520s}.
+    \item Only \textbf{266s} (Stage~1) are spent under DP-Adam overhead; the remaining \textbf{407s} (Stage~2) run at standard-optimizer speed.
+    \item Because the DP-active window is short and bounded by the convergence trigger -- not a fixed fraction of total epochs -- the runtime penalty does not scale linearly with training length.
+    \item Net effect: most of the wall-clock cost of DP is paid once, early, and is never repeated for the remaining epochs.
+\end{itemize}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 4b: Validation Accuracy vs Epoch (New Table)
+%--------------------------------------------------
+\begin{frame}{CascadedDP Stage 1: Late-Epoch Validation Progression}
+\vspace{0.2cm}
+\begin{columns}[v]
+\begin{column}{0.48\textwidth}
+    \centering
+    \small
+    \begin{tabular}{cc}
+        \toprule
+        \textbf{Epoch} & \textbf{Validation Accuracy (\%)} \\ \midrule
+        8              & 74.35                             \\
+        9              & 75.56                             \\
+        10             & 76.01                             \\
+        11             & 76.32                             \\
+        \textbf{12 (Drop Point)} & \textbf{77.50}           \\ \bottomrule
+    \end{tabular}
+\end{column}
+\hfill
+\begin{column}{0.48\textwidth}
+    \small
+    \textbf{Context \& Dynamics:}
+    \begin{itemize}
+        \item Shows the steady ascent toward convergence right before the privacy block is dropped at Epoch 12.
+        \item The final step up to \textbf{77.50\%} serves as the baseline starting point for the unconstrained Stage~2 recovery phase.
+    \end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 5: Runtime vs. Data Heterogeneity
+%--------------------------------------------------
+\begin{frame}{Results: Runtime vs. Data Heterogeneity}
+\centering
+\includegraphics[width=0.78\textwidth,height=0.82\textheight,keepaspectratio]{results_section/runtime_vs_heterogeneity_twin_axis.png}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 6: Observations on Runtime vs. Heterogeneity
+%--------------------------------------------------
+\begin{frame}{Key Observations: Runtime vs. Heterogeneity}
+\begin{itemize}
+    \item The CascadedDP-over-Full-DP runtime saving is consistently large and stable across the heterogeneity sweep: \textbf{42\%} (IID), \textbf{40\%} ($\alpha=1.0$), \textbf{43\%} ($\alpha=0.5$), \textbf{38\%} ($\alpha=0.1$), \textbf{28\%} (Extreme Skew).
+    \item Absolute runtimes fall toward $\alpha = 0.1$ for \emph{all three} methods -- this tracks the samples-per-node axis shown above the plot (\textbf{30{,}000 $\rightarrow$ 20{,}160}), a side effect of Dirichlet min-cut equalization, not heterogeneity itself.
+    \item Because all three curves shrink together, the \emph{relative} CascadedDP advantage is preserved even though the \emph{absolute} numbers are confounded by shrinking dataset size at low $\alpha$.
+    \item Extreme Skew uses a different, label-exclusive partitioning (5 classes/node, no Dirichlet trimming) and returns to full 30{,}000-sample volume -- explaining the runtime rebound at the right edge of the plot.
+\end{itemize}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 7: Accuracy vs. Data Heterogeneity
+%--------------------------------------------------
+\begin{frame}{Results: Accuracy vs. Data Heterogeneity}
+\centering
+\includegraphics[width=0.78\textwidth,height=0.82\textheight,keepaspectratio]{results_section/accuracy_vs_heterogeneity_twin_axis.png}
+\end{frame}
+
+%--------------------------------------------------
+% Results Slide 8: Observations on Accuracy vs. Heterogeneity
+%--------------------------------------------------
+\begin{frame}{Key Observations: Accuracy vs. Heterogeneity}
+\begin{itemize}
+    \item CascadedDP tracks the No~DP baseline closely from IID through $\alpha = 0.5$ (within 0.5 points), while Full~DP degrades sharply over the same range ($82.8\% \rightarrow 71.3\%$).
+    \item All three methods drop together at $\alpha = 0.1$ -- this coincides with the smallest samples-per-node point (\textbf{20{,}160}), so part of this dip is a data-volume effect layered on top of heterogeneity, not heterogeneity alone.
+    \item At Extreme Skew, Full~DP (\textbf{76.42\%}) slightly outperforms CascadedDP (\textbf{74.11\%}) -- the only point in the sweep where early DP removal underperforms. This may indicate the quorum-based drop trigger fires prematurely under complete label exclusivity, worth further investigation.
+    \item Overall takeaway: CascadedDP's accuracy advantage over Full~DP is robust across realistic heterogeneity regimes, with one identified edge case under maximal label skew.
+\end{itemize}
+\end{frame}
+%--------------------------------------------------
+% Conclusion Slide
+%--------------------------------------------------
+\begin{frame}{Conclusion \& Future Outlook}
+\begin{block}{Breaking the Privacy--Utility Deadlock}
+    Our evaluation of \textbf{CascadedDP} demonstrates that privacy does not require permanent utility degradation. By bounding the DP-Adam overhead strictly to early training phases, we achieve a near-baseline accuracy recovery (\textbf{87.94\%}) alongside a structural \textbf{40\% runtime reduction}.
+\end{block}
+
+\vspace{0.2cm}
+\textbf{Key Takeaways:}
+\begin{itemize}
+    \item \textbf{Robustness:} The relative performance and efficiency advantages hold steady across various non-IID and Dirichlet data heterogeneity configurations.
+    \item \textbf{Decentralized Security:} The quorum-based voting mechanism ensures that fast-converging nodes cannot drop protection prematurely or expose slower peers.
+    \item \textbf{Future Work:} Investigating adaptive thresholds to dynamically navigate extreme, label-exclusive skews or unequal node partitions where fixed triggers might not be enough.
+\end{itemize}
+\end{frame}
+
+%--------------------------------------------------
+% Thank You Slide
+%--------------------------------------------------
+\begin{frame}[c]{}
+\centering
+\Huge{\textbf{Thank You!}}
+\end{frame}
 \end{document}

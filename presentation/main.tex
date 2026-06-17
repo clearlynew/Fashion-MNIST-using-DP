@@ -1,10 +1,197 @@
-]\documentclass[aspectratio=169]{beamer}
+\documentclass[aspectratio=169]{beamer}
 \usepackage{amsmath,booktabs,graphicx}
 \usetheme{Madrid}
 
 \setbeamertemplate{navigation symbols}{} % Remove navigation icons
 
 \begin{document}
+
+% --- Anushka --- %
+% --- Slide 0: Title --- %
+\begin{frame}
+    \begin{center}
+        \vspace{0.8cm}
+        {\LARGE \textbf{Enabling Differential Privacy}}\\[0.5cm]
+        {\large in HPE's Swarm Learning}\\[0.8cm]
+        \rule{7cm}{0.4pt}\\[0.5cm]
+        {\normalsize Anushka \quad | \quad Sidharth \quad | \quad Hima \quad | \quad Allen \quad | \quad Goutham }\\[0.3cm]
+    \end{center}
+\end{frame}
+
+% --- Slide 1: What is Swarm Learning? ---
+\begin{frame}{What is Swarm Learning?}
+    \begin{columns}[T]
+        \begin{column}{0.55\textwidth}
+            \begin{block}{Definition}
+                \textbf{HPE Swarm Learning} is a decentralized, privacy-preserving ML framework that uses computing power at distributed data sources to train models — without sharing raw data. Collaboration is secured via a \textbf{blockchain} platform.
+            \end{block}
+            \vspace{0.3cm}
+            \textbf{How it differs from standard FL}
+            \begin{itemize}
+                \item No central server — fully peer-to-peer
+                \item Training occurs at the \textbf{edge}, where data lives
+                \item Only model weights are shared; \textbf{raw data never leaves} the node
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.45\textwidth}
+            \includegraphics[width=\textwidth]{why_swarm.png}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Swarm Network Architecture}
+    \begin{center}
+        \includegraphics[width=0.5\textwidth]{swarm_components.png}
+    \end{center}
+\end{frame}
+
+% --- Slide 2: Swarm Network Components (1/2) ---
+\begin{frame}{Node Types in a Swarm Network}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{SL Node (Swarm Learning Node)}
+                \begin{itemize}
+                    \item Core ML training component
+                    \item Trains locally on private data
+                    \item Shares model weights with peers; never raw data
+                    \item Merges insights received from other SL nodes
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{SN Node (Swarm Network Node)}
+                \begin{itemize}
+                    \item Forms the Ethereum blockchain network
+                    \item Maintains training state and coordinates the swarm
+                    \item Stores only metadata — \textit{not} model weights
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 3: Swarm Network Components (2/2) ---
+\begin{frame}{Node Types in a Swarm Network (contd.)}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Sentinel Node}
+                \begin{itemize}
+                    \item A special SN node that initializes the blockchain
+                    \item Must be the first node to start in any swarm run
+                    \item Blockchain state can persist across restarts
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{SWOP \& SWCI}
+                \begin{itemize}
+                    \item \textbf{SWOP:} Operator agent — starts/stops runs, builds and upgrades ML containers
+                    \item \textbf{SWCI:} Command interface — connects to SN nodes for monitoring and management
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 4: How Swarm Training Works ---
+\begin{frame}{The Swarm Training Loop}
+    \begin{columns}[T]
+        \begin{column}{0.55\textwidth}
+            \begin{enumerate}
+                \item \textbf{Acquire identity:} Each SL node obtains an X.509/SPIRE certificate and a license.
+                \item \textbf{Register:} Node registers with an SN node and starts its local file server.
+                \item \textbf{Train locally:} Nodes train independently on their private data.
+                \item \textbf{Synchronize:} At set intervals, nodes share model updates — not raw data — with peers.
+                \item \textbf{Leader election:} One node is elected \textit{Leader} to aggregate all updates.
+                \item \textbf{Merge \& distribute:} Leader produces a global model and sends it back to all nodes.
+            \end{enumerate}
+        \end{column}
+        \begin{column}{0.42\textwidth}
+            \begin{block}{Minimum Peers}
+                \begin{itemize}
+                    \item A minimum peer count can be set for synchronization
+                    \item Sync is blocked if peers fall below this threshold
+                    \item Resumes once enough peers reach the sync point
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 5: Synchronization ---
+\begin{frame}{Controlling Synchronization Frequency}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Sync Frequency}
+                \begin{itemize}
+                    \item Determines how often nodes share updates
+                    \item Measured in training batches
+                    \item Large value $\rightarrow$ fewer synchronizations, faster training
+                    \item Small value $\rightarrow$ more synchronizations, better accuracy
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Adaptive Synchronization}
+                \begin{itemize}
+                    \item Adjusts sync frequency automatically based on training signal
+                    \item Loss decreasing $\rightarrow$ synchronize less often
+                    \item Loss stagnant $\rightarrow$ synchronize more often
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 6: Model Merging ---
+\begin{frame}{Model Merging and Merge Methods}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{How it works}
+                \begin{itemize}
+                    \item One SL node is elected \textbf{Leader}
+                    \item Leader collects model updates from all peers
+                    \item Creates a single global model
+                    \item Sends the merged model back to all nodes
+                    \item Each node uses the merged model to start the next training batch
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Merge Methods}
+                \begin{itemize}
+                    \item \textbf{Mean} (Federated Averaging) — default; weighted average of all updates
+                    \item \textbf{Coordinate Median} — uses the median instead of mean; robust against outliers
+                    \item \textbf{Geometric Median} — uses Weiszfeld's algorithm; better represents all nodes
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 7: Leader Failure & Model Exchange ---
+\begin{frame}{Leader Failure Detection and Recovery (LFDR)}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{alertblock}{When the Leader Fails}
+                \begin{itemize}
+                    \item If the leader fails \textit{during} the merge process, training does not halt
+                    \item A new leader is automatically elected to continue merging
+                    \item If the failed leader recovers, it rejoins as a normal SL node
+                \end{itemize}
+            \end{alertblock}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Model Exchange}
+                \begin{itemize}
+                    \item Each SL node uses the merged model to begin the next training batch
+                    \item Exchange is coordinated by the SN network
+                    \item Models are transferred via the Swarm Learning file server
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
 
 % --- Sidharth --- %
 % --- Slide 1: The Swarm Privacy Paradox ---

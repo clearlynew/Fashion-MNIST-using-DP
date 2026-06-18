@@ -336,12 +336,22 @@
 \begin{frame}{How DP Works: Adding Noise to Gradients}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
-            \begin{block}{The Two-Step Process}
+             \begin{block}{The Two-Step Process}
                 During training, instead of sharing raw gradient updates, each node applies DP through two operations:
                 \begin{enumerate}
-                    \item \textbf{Clip:} Each gradient is clipped to a maximum norm $C$. This limits how much any single data point can influence the update.
-                    \item \textbf{Add Noise:} Gaussian noise $\mathcal{N}(0, \sigma^2)$ is added to the clipped gradient before it is shared.
+                    \item \textbf{Clip:} Each individual gradient is clipped to a maximum norm $C$. This limits the influence of any single data point on the update.
+                    \item \textbf{Add Noise:} Gaussian noise is added to the clipped gradient before it is shared.
                 \end{enumerate}
+
+            
+            \[
+            g
+            \;\rightarrow\;
+            \mathrm{Clip}(g,C)
+            \;\rightarrow\;
+            \mathrm{Clip}(g,C)
+            + \mathcal{N}(0,\sigma^2)
+            \]
             \end{block}
         \end{column}
         \begin{column}{0.48\textwidth}

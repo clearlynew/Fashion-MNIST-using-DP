@@ -292,6 +292,150 @@
     \end{columns}
 \end{frame}
 
+% --- Goutham --- %
+% --- Slide 1: What is Differential Privacy? ---
+\begin{frame}{What is Differential Privacy?}
+    \begin{columns}[T]
+        \begin{column}{0.55\textwidth}
+            \begin{block}{The Core Idea}
+                \textbf{Differential Privacy (DP)} is a mathematical guarantee that the output of a computation reveals almost nothing about any single individual in the dataset.
+                
+                \vspace{0.2cm}
+                In other words: if one person's record is added or removed, the output should look essentially the same to any observer.
+            \end{block}
+            \vspace{0.3cm}
+            \textbf{Why does this matter?}
+            \begin{itemize}
+                \item Raw data is never directly shared — but outputs (like model weights) can still leak private information
+                
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.42\textwidth}
+            \begin{block}{Formal Definition: $(\varepsilon, \delta)$-DP}
+                For two datasets $D$, $D'$ differing by one record, and any output set $S$:
+                \[
+                    \Pr[\mathcal{M}(D) \in S] \leq e^{\varepsilon} \cdot \Pr[\mathcal{M}(D') \in S] + \delta
+                \]
+                where $\mathcal{M}$ is the randomized mechanism, and:
+                \begin{itemize}
+                    \item \textbf{$\varepsilon$:} Privacy budget — lower means stronger privacy
+                    \item \textbf{$\delta$:} Small probability that the guarantee fails; kept near zero in practice
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{How DP Works: Illustration}
+    \begin{center}
+        \includegraphics[width=0.9\textwidth]{DP_Info.png}
+    \end{center}
+\end{frame}
+
+% --- Slide 2: How DP Works — The Mechanism ---
+\begin{frame}{How DP Works: Adding Noise to Gradients}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{The Two-Step Process}
+                During training, instead of sharing raw gradient updates, each node applies DP through two operations:
+                \begin{enumerate}
+                    \item \textbf{Clip:} Each gradient is clipped to a maximum norm $C$. This limits how much any single data point can influence the update.
+                    \item \textbf{Add Noise:} Gaussian noise $\mathcal{N}(0, \sigma^2)$ is added to the clipped gradient before it is shared.
+                \end{enumerate}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Privacy Budget Accounting}
+                \begin{itemize}
+                    \item Every noisy update \textit{consumes} a portion of the privacy budget $\varepsilon$
+                    \item The total budget spent grows with the number of training steps
+                    \item Once $\varepsilon$ is exhausted, continuing to train weakens the privacy guarantee
+                \end{itemize}
+            \end{block}
+            \vspace{0.3cm}
+            \begin{alertblock}{Key Insight}
+                The privacy budget $\varepsilon$ is finite and non-renewable — every training step spends it.
+            \end{alertblock}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 3: Attacks DP Guards Against ---
+\begin{frame}{What Attacks Does DP Defend Against?}
+
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Gradient Inversion}
+                Noise added to gradients corrupts the signal an adversary needs to reconstruct training inputs. Even if gradients are intercepted, recovery of the original data becomes statistically infeasible.
+            \end{block}
+            \vspace{0.2cm}
+            \begin{block}{Membership Inference}
+                Clipping and noise flatten the confidence spikes that reveal whether a specific record was in the training set. The adversary's ability to determine data membership is mathematically bounded.
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{GAN-based Leakage}
+                When a malicious peer tries to use shared weights as a discriminator to reconstruct client data, noisy weights degrade the discriminator's fidelity — making high-quality reconstruction impossible.
+            \end{block}
+            \vspace{0.2cm}
+            \begin{alertblock}{Important Caveat}
+                DP only protects the \textit{mathematical} output. DP is a defense against inferential attacks, not data breach attacks.
+            \end{alertblock}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 4: DP in Distributed / Federated Settings ---
+\begin{frame}{DP in Distributed Learning: Why It Fits Swarm Learning}
+    \begin{columns}[T]
+        \begin{column}{0.55\textwidth}
+            \begin{block}{Why Standard FL/SL Still Leaks}
+                Swarm Learning keeps raw data local — but every peer-to-peer weight exchange is still a potential attack surface. A compromised blockchain observer or a node can extract private signals from model parameters without ever accessing the original dataset.
+            \end{block}
+            \vspace{0.3cm}
+            \textbf{How DP plugs this gap:}
+            \begin{itemize}
+                \item Each SL node applies DP locally before sharing weights
+                \item Noise is added at the source — so intercepted parameters are already privatized
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.42\textwidth}
+            \begin{block}{Local vs. Central DP}
+                \begin{itemize}
+                    \item \textbf{Central DP:} A trusted aggregator adds noise after collecting all updates — not suitable for Swarm Learning's peer-to-peer design
+                    \item \textbf{Local DP:} Each node privatizes its own update before sharing — fits naturally with Swarm Learning's decentralized, no-central-server architecture
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% --- Slide 5: The Trade-offs of Using DP ---
+\begin{frame}{The Cost of Privacy: DP Trade-offs in Practice}
+    DP provides strong mathematical guarantees, but applying it throughout comes with tradeoffs:
+
+    \vspace{0.1cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{What DP Costs}
+                \begin{itemize}
+                    \item \textbf{Accuracy Loss:} Added noise degrades model quality — especially severe under non-IID or heterogeneous data distributions
+                    \item \textbf{Slower Training:} Per-sample gradient clipping introduces significant compute overhead, often $2\times$–$10\times$ slower than standard training
+                    \item \textbf{Budget Exhaustion:} Long training runs deplete $\varepsilon$ quickly, forcing a choice between training duration and privacy strength
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{alertblock}{The Core Dilemma}
+                Stronger privacy ($\downarrow \varepsilon$) requires more noise, which directly degrades accuracy and slows convergence.
+            \end{alertblock}
+            \vspace{0.3cm}
+            \begin{exampleblock}{The Natural Question}
+                Is it necessary to apply DP \textit{throughout all of training} — or only during the phases where privacy risk is highest?
+            \end{exampleblock}
+        \end{column}
+    \end{columns}
+\end{frame}
 
 % --- Allen --- %
 %--------------------------------------------------
